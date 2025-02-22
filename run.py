@@ -1,5 +1,10 @@
 from flask import Flask, jsonify, request, send_file
 from app.utils import validate_process_excel_request
+from dotenv import load_dotenv
+from config import logger
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -23,4 +28,5 @@ def process_excel():
 
 
 if __name__ == '__main__':
+    logger.info("Starting the server...")
     app.run(host="0.0.0.0", port=5000, debug=True)
