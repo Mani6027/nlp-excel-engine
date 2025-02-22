@@ -1,0 +1,11 @@
+services:
+  web:
+    build: .
+    ports:
+      - "5001:5000"
+    volumes:
+      - .:/app  # Bind mount the current directory to /app in the container
+      - /app/__pycache__
+    environment:
+      FLASK_ENV: development
+    command: python run.py

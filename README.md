@@ -17,6 +17,8 @@ NLP-Excel-Engine is a tool that combines **LLM (Large Language Models) and Excel
 
 * For development, simply run:
   ```
-  python run.py
+  docker-compose up --build
   ```
 * Once the application is up and running, you can check its health status using the  /**health endpoint** .
+* Access the app at: http:.//localhost:5001
+* Added docker-componse to reload docker build when the files are updated.
