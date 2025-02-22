@@ -1,4 +1,5 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
+from app.utils import validate_process_excel_request
 
 app = Flask(__name__)
 
@@ -11,24 +12,15 @@ def health_check():
 
 
 @app.route('/process-excel', methods=['POST'])
+@validate_process_excel_request
 def process_excel():
     """
     Process Excel endpoint
     """
-    if ("file" not in request.files) or ("instruction" not in request.form):
-        # TODO: raise valid exception here.
-        return jsonify({"error": "No file uploaded"}), 400
-    
-    file = request.files['file']
-    instruction = request.form['instruction']
-    
-    if file.filename == '':
-        # TODO: raise valid exception here.
-        return jsonify({"error": "No file uploaded"}), 400
-    
     # call the function to process the excel file
 
-    return jsonify({"status": "ok"})
+    return send_file(output, attachment_filename="placeholder_name.xlsx", as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') 
+
 
 if __name__ == '__main__':
     app.run(debug=True, use_reloader=True)
