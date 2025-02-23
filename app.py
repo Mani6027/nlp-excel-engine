@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 from flask import Flask, jsonify, send_file
 
-from app.utils import validate_process_excel_request
+from utils import validate_process_excel_request
 from config import logger
 
 # Load environment variables from .env file

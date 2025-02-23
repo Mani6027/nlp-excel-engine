@@ -3,7 +3,7 @@
 """
 from flask import jsonify, Flask
 
-from app.utils import validate_process_excel_request
+from utils import validate_process_excel_request
 
 app = Flask(__name__)
 

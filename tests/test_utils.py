@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pandas as pd
 from pydantic import ValidationError
 
-from app.utils import extract_excel_metadata
+from utils import extract_excel_metadata
 from tests import BaseTest
 from tests.mocks.mock_utils import app
 

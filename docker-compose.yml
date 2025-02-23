@@ -8,4 +8,4 @@ services:
       - /app/__pycache__
     environment:
       FLASK_ENV: development
-    command: python run.py
+    command: python app.py
