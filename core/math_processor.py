@@ -20,6 +20,29 @@ class MathOperationExecutor:
         if column not in df.columns:
             raise ValueError(f"Column '{column}' does not exist in DataFrame.")
 
+    def join(self, left_df: pd.DataFrame, right_df: pd.DataFrame,
+             how: str, on: Union[str, List[str]]) -> pd.DataFrame:
+        """
+        Joins two DataFrames based on a key column or columns.
+
+        :param left_df: The left DataFrame to join
+        :param right_df: The right DataFrame to join
+        :param how: Type of join to perform ('inner', 'left', 'right', 'outer')
+        :param on: Column name(s) to join on
+        :return: The resultant joined DataFrame
+        """
+        if not right_df:
+            raise ValueError("Right DataFrame is required for join operation.")
+
+        if isinstance(on, str):
+            on = [on]
+
+        for column in on:
+            self.__check_column_exists(left_df, column)
+            self.__check_column_exists(right_df, column)
+
+        return pd.merge(left_df, right_df, how=how, on=on)
+
     def pivot(self, df: pd.DataFrame, index_col: str, value_col: str, aggfunc: str = 'sum') -> pd.DataFrame:
         """
         Creates a pivot table from the DataFrame
@@ -133,12 +156,13 @@ class MathOperationExecutor:
             df[new_column_name] = df[columns[0]] / value
             return df[new_column_name]
 
-    def execute(self, df: pd.DataFrame, metadata: dict) -> Union[pd.DataFrame, pd.Series, float]:
+    def execute(self, df: pd.DataFrame, metadata: dict, right_df = None) -> Union[pd.DataFrame, pd.Series, float]:
         """
             Method to execute a math operation based on operation type and its arguments.
 
         :param df: DataFrame to perform the operation on
         :param metadata: Metadata containing operation type and its arguments
+        :param right_df: Optional right DataFrame for join operations
         :return: Result of the operation
         """
         value_mapper = {
@@ -163,9 +187,17 @@ class MathOperationExecutor:
 
         columns = metadata.get('columns')
         method = operation_mapper[operation]
+
         if operation == Operations.PIVOT_TABLE:
             return self.pivot(df, metadata.get('index_column'),
                           metadata.get('values_column'), metadata.get('aggregation_function'))
+
         if operation == Operations.UNPIVOT_TABLE:
             return self.unpivot(df, metadata.get("id_vars"), metadata.get("var_name"), metadata.get("value_name"))
+
+        if operation == Operations.OPERATION_JOIN:
+            join_type = metadata.get("parameters", {}).get("join_type")
+            on = metadata.get("parameters", {}).get("on")
+            how = Operations.DF_JOIN_MAPPER.get(join_type)
+            return self.join(df, right_df=right_df, how=how, on=on)
         return method(df, columns, metadata.get(value_mapper[operation]))
