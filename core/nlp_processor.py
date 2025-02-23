@@ -1,4 +1,7 @@
+import os
+
 import pandas as pd
+import google.generativeai as genai
 
 
 class NLPTaskExecutor:
@@ -10,7 +13,21 @@ class NLPTaskExecutor:
         """
             Private method to load llm client. Using lazy loading to avoid creating multiple instance.
         """
-        pass
+        genai.configure(api_key=os.environ.get('GEMINI_FLASH_API_KEY'))
+        generation_config = {
+            "temperature": 0,
+            "top_p": 0.95,
+            "top_k": 40,
+            "max_output_tokens": 8192,
+            "response_mime_type": "application/json",
+        }
+        system_prompt = ""
+        model = genai.GenerativeModel(
+            "gemini-2.0-flash",
+            generation_config=generation_config,
+            system_instruction=system_prompt
+        )
+        chat_session = model.start_chat(history=[])
 
     def sentiment_analysis(self, df: pd.DataFrame, column: str):
         """
