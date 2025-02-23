@@ -14,7 +14,7 @@ def health_check():
     """
     Health check endpoint
     """
-    return jsonify({"status": "ok"})
+    return jsonify({"status": "ok"}), 200
 
 
 @app.route('/process-excel', methods=['POST'])
@@ -25,8 +25,8 @@ def process_excel():
     """
     # call the function to process the excel file
 
-    return send_file("", attachment_filename="placeholder_name.xlsx", as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-
+    # return send_file("", attachment_filename="placeholder_name.xlsx", as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return jsonify({"status": "success"}), 200
 
 if __name__ == '__main__':
     logger.info("Starting the server...")

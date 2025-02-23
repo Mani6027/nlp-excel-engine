@@ -7,7 +7,7 @@ from functools import wraps
 
 import google.generativeai as genai
 import pandas as pd
-from flask import request, jsonify
+from flask import request, jsonify, g
 from pydantic import BaseModel, Field, model_validator
 
 from config import logger
@@ -39,6 +39,8 @@ def validate_process_excel_request(func: callable) -> callable:
     """
     @wraps(func)
     def decorated_function(*args, **kwargs):
+        logger.debug(f"file:: {request.files}")
+        logger.debug(f"form:: {request.form}")
         if 'file' not in request.files or 'instructions' not in request.form:
             return jsonify({"error": "File and instructions are required"}), 400
 
@@ -53,9 +55,9 @@ def validate_process_excel_request(func: callable) -> callable:
             params = extract_params_from_instructions(excel_metadata, instructions)
             if not params:
                 return jsonify({"error": "Invalid instructions"}), 400
-            validate_params_from_instructions(params)
-        
-        return func(file, instructions, *args, **kwargs)
+            validated_params = validate_params_from_instructions(params)
+            g.params = validated_params
+        return func(*args, **kwargs)
     return decorated_function
 
 
@@ -80,7 +82,7 @@ def extract_params_from_instructions(excel_metadata, instructions: str) -> dict:
     chat_session = model.start_chat(history=[])
     _response = chat_session.send_message(instructions)
     _response = _response.text
-    logger.debug(f"response from gemini: {_response}")
+    logger.info(f"response from gemini: {_response}")
     return json.loads(_response)
 
 
