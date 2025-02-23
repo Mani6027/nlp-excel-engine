@@ -1,51 +1,60 @@
-EXTRACTION_PROMPT = """
-You are a helpful assistant.
+INITIAL_PROMPT= """
+You are a helpful assistant. Here is metadata about the Excel file:
 
-Analyze the user query and extract operation and parameters in JSON format.
+{excel_metadata}
 
-Available operations: addition, subtraction, multiplication, summation, aggregation, avg, min, inner_join.
+Analyze the user query and extract the operation and parameters in a consistent JSON format.
+"""
 
-**Rules:**
+EXCEL_PARAM_EXTRACTION_PROMPT = """
 
-1. Identify the operation from the provided list.
-2. Extract column names and sheet names (if any).
-3. Return a JSON object with "operation", "columns" (list), and "sheets" (list, optional).
-4. If no parameters, return only {"operation": "operation_name"}.
+## Available Operations (with concise examples)
 
-**Examples:**
+**Math Operations**
 
-User Query: sum of the Q1 column from the sheet sales data.
-Output: {"operation": "summation", "columns": ["Q1"], "sheets": ["sales data"]}
+- `addition` (e.g., `{"operation": "addition", "columns": ["Quantity", "Profit"], "sheets": ["Sales"], "parameters": {"add_value": 10}}`)
+- `subtraction` (e.g., `{"operation": "subtraction", "columns": ["Revenue", "Customer Acquisition"], "sheets": ["Sales"], "parameters": {"subtract_value": 50}}`)
+- `multiplication` (e.g., `{"operation": "multiplication", "columns": ["Quantity", "Revenue"], "sheets": ["Sales"], "parameters": {}}`)
+- `division` (e.g., `{"operation": "division", "columns": ["Revenue", "Quantity"], "sheets": ["Sales"], "parameters": {}}`)
+- `summation` (e.g., `{"operation": "summation", "columns": ["Revenue"], "sheets": ["Sales"], "parameters": {}}`)
+- `aggregation` (e.g., `{"operation": "aggregation", "columns": ["Revenue"], "sheets": ["Sales"], "parameters": {"group_by": "Product"}}`)
+- `avg` (e.g., `{"operation": "avg", "columns": ["Rating"], "sheets": ["Customer Reviews"], "parameters": {}}`)
+- `min` (e.g., `{"operation": "min", "columns": ["Stock"], "sheets": ["Inventory"], "parameters": {}}`)
+- `max` (e.g., `{"operation": "max", "columns": ["Revenue"], "sheets": ["Sales"], "parameters": {}}`)
 
-User Query: Average of math column from batch d sheet.
-Output: {"operation": "avg", "columns": ["math"], "sheets": ["batch d"]}
+**Join Operations**
 
-User Query: Min of order count from purchase order request sheet.
-Output: {"operation": "min", "columns": ["order count"], "sheets": ["purchase order request"]}
+- `inner_join` (e.g., `{"operation": "join", "columns": ["Item Code"], "sheets": ["Sales", "Inventory"], "parameters": {"join_type": "inner_join", "on": "Item Code"}}`)
+- `left_join` (e.g., `{"operation": "join", "columns": ["Item Code"], "sheets": ["Sales", "Inventory"], "parameters": {"join_type": "left_join", "on": "Item Code"}}`)
+- `right_join` (e.g., `{"operation": "join", "columns": ["Item Code"], "sheets": ["Sales", "Inventory"], "parameters": {"join_type": "right_join", "on": "Item Code"}}`)
+- `full_outer_join` (e.g., `{"operation": "join", "columns": ["Item Code"], "sheets": ["Sales", "Inventory"], "parameters": {"join_type": "full_outer_join", "on": "Item Code"}}`)
 
-User Query: Add mac and ipad columns from purchase order sheet
-Output: {"operation": "addition", "columns": ["mac", "ipad"], "sheets": ["purchase order"]}
+**Pivot and Unpivot Operations**
 
-User Query: join purchase order and purchase request on user id.
-Output: {"operation": "inner_join", "columns": ["user id"], "sheets": ["purchase order", "purchase request"]}
+- `pivot_table` (e.g., `{"operation": "pivot_table", "columns": ["Product", "Revenue"], "sheets": ["Sales"], "parameters": {"index_column": "Product", "values_column": "Revenue", "aggregation_function": "sum"}}`)
+- `unpivot_table` (e.g., `{"operation": "unpivot_table", "columns": ["Product", "Revenue", "Quantity", "Date"], "sheets": ["Sales"], "parameters": {}}`)
 
-User Query: Calculate the total.
-Output: {"operation": "summation"}
+**Date Operations**
 
-User Query: Multiply A and B from sheet data.
-Output: {"operation": "multiplication", "columns": ["A", "B"], "sheets": ["data"]}
+- `extract_date_parts` (unit: `year`, `month`, `day`) (e.g., `{"operation": "extract_date_parts", "columns": ["Date"], "sheets": ["Sales"], "parameters": {"unit": "year"}}`)
+- `date_difference` (unit: `days`, `months`, `years`) (e.g., `{"operation": "date_difference", "columns": ["Date", "Ship Date"], "sheets": ["Sales"], "parameters": {"unit": "days"}}`)
 
-User Query: Aggregate the values from the sales column.
-Output: {"operation": "aggregation", "columns": ["sales"]}
+**NLP Operations (Unstructured Data Processing)**
 
-User Query: Subtract column B from column A.
-Output: {"operation": "subtraction", "columns": ["A", "B"]}
+- `sentiment_analysis` (e.g., `{"operation": "sentiment_analysis", "columns": ["Feedback"], "sheets": ["Customer Reviews"], "parameters": {"task": "sentiment_analysis", "language": "en", "output_column": "Sentiment"}}`)
+- `summarization` (e.g., `{"operation": "summarization", "columns": ["Feedback"], "sheets": ["Customer Reviews"], "parameters": {"task": "summarization", "language": "en", "output_column": "Summary"}}`)
+- `text_classification` (e.g., `{"operation": "text_classification", "columns": ["Feedback"], "sheets": ["Customer Reviews"], "parameters": {"task": "text_classification", "language": "en", "output_column": "Category"}}`)
 
-User Query: Run a Q1 analysis on Q1 column to find sum of all amount.
-Output: {"operation": "summation", "columns": ["Q1"], "sheets": []}
+## Rules for Extraction
 
-User Query: Find the minimum value.
-Output: {"operation": "min"}
-
-User Query: {user_query}
+1. **Identify the operation** from the available list.
+2. **Extract column names and sheet names from the User Query**
+    - **Column Extraction:**
+        - Extract only **exactly matching column names** from the provided metadata.
+        - Prioritize names mentioned inside **quoted text** (e.g., `"feedback"`).
+    - **Sheet Extraction:**
+        - Extract **explicitly mentioned sheet names** as stated.
+        - Infer sheet names **only if contextually clear** (e.g., "Pivot sales data" → "Sales").
+        - If no sheet name is mentioned or inferable, set `"sheets": []`.
+3. **Ensure a structured and concise JSON output.**
 """
