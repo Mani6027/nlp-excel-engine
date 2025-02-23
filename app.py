@@ -1,5 +1,11 @@
-from flask import Flask, jsonify, request, send_file
-from app.utils import validate_process_excel_request
+from dotenv import load_dotenv
+from flask import Flask, jsonify, send_file
+
+from utils import validate_process_excel_request
+from config import logger
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -19,8 +25,9 @@ def process_excel():
     """
     # call the function to process the excel file
 
-    return send_file(output, attachment_filename="placeholder_name.xlsx", as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') 
+    return send_file("", attachment_filename="placeholder_name.xlsx", as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 if __name__ == '__main__':
+    logger.info("Starting the server...")
     app.run(host="0.0.0.0", port=5000, debug=True)
