@@ -22,6 +22,9 @@ class Operations:
     RIGHT_JOIN = 'right_join'
     FULL_OUTER_JOIN = 'full_outer_join'
 
+    # date operations
+    DATE_DIFFERENCE = 'date_difference'
+
     DF_JOIN_MAPPER = {
         INNER_JOIN: 'inner',
         LEFT_JOIN: 'left',

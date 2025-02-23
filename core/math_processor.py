@@ -1,6 +1,7 @@
 from typing import Union, List
 
 import pandas as pd
+from dateutil.relativedelta import relativedelta
 
 from constants import Operations
 
@@ -19,6 +20,44 @@ class MathOperationExecutor:
         """
         if column not in df.columns:
             raise ValueError(f"Column '{column}' does not exist in DataFrame.")
+
+    @staticmethod
+    def __calculate_dt_difference_in_months(df, column_start, column_end):
+        df['Month_diff'] = df.apply(lambda row: relativedelta(row[column_end], row[column_start]).months, axis=1)
+        return df['Month_diff']
+
+    @staticmethod
+    def __calculate_dt_difference_in_years(df, column_start, column_end):
+        df['Year_diff'] = df.apply(lambda row: relativedelta(row[column_end], row[column_start]).years, axis=1)
+        return df['Year_diff']
+
+    def date_difference(self, df: pd.DataFrame, column_start: str, column_end: str, unit: str = 'days') -> pd.Series:
+        """
+        Calculate the difference between two date columns.
+
+        :param df: DataFrame to perform the operation on
+        :param column_start: Name of the start date column
+        :param column_end: Name of the end date column
+        :param unit: Time unit for the difference ('days', 'hours', 'minutes', etc.)
+        :return: Series with the difference in the specified unit
+        """
+        # Ensure the date columns exist
+        self.__check_column_exists(df, column_start)
+        self.__check_column_exists(df, column_end)
+
+        # Convert columns to datetime if not already
+        start_dates = pd.to_datetime(df[column_start])
+        end_dates = pd.to_datetime(df[column_end])
+
+        if unit == 'days':
+            df['Day_diff'] = (end_dates - start_dates).dt.days
+            return df['Day_diff']
+        elif unit == 'months':
+            return self.__calculate_dt_difference_in_months(df, column_start, column_end)
+        elif unit == 'year':
+            return self.__calculate_dt_difference_in_years(df, column_start, column_end)
+        else:
+            raise ValueError(f"Invalid time unit: {unit}")
 
     def join(self, left_df: pd.DataFrame, right_df: pd.DataFrame,
              how: str, on: Union[str, List[str]]) -> pd.DataFrame:
@@ -200,4 +239,6 @@ class MathOperationExecutor:
             on = metadata.get("parameters", {}).get("on")
             how = Operations.DF_JOIN_MAPPER.get(join_type)
             return self.join(df, right_df=right_df, how=how, on=on)
+        if operation == Operations.DATE_DIFFERENCE:
+            self.date_difference(df, metadata.get('columns')[0], metadata.get('columns')[1], metadata.get('parameters').get('unit'))
         return method(df, columns, metadata.get(value_mapper[operation]))
