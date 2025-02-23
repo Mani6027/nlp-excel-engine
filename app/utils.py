@@ -1,28 +1,29 @@
 """
 Utility functions for the application
 """
-from flask import request, jsonify
+import json
+import os
 from functools import wraps
+
+from flask import request, jsonify
 from google import genai
 from pydantic import BaseModel, Field
-from system_prompt import EXTRACTION_PROMPT
-from typing import List, Optional
-import os
-import json
+
 from config import logger
+from system_prompt import EXTRACTION_PROMPT
 
 
-# create a schema for parametere checking from instructions
+# create a schema for parameters checking from instructions
 class Parameters(BaseModel):
-	"""
-	Schema for parameters extracted from the instructions
-	"""
-	operation: str = Field(..., description="The identified operation from the query.")
-	columns: Optional[List[str]] = Field(default_factory=list, description="List of column names extracted from the query.")
-	sheets: Optional[List[str]] = Field(default_factory=list, description="List of sheet names extracted from the query.")
+    """
+    Schema for parameters extracted from the instructions
+    """
+    operation: str = Field(..., description="The identified operation from the query.")
+    columns: list[str] = Field(default_factory=list, description="List of column names extracted from the query.")
+    sheets: list[str] = Field(default_factory=list, description="List of sheet names extracted from the query.")
 
-	def to_dict(self):
-		return self.model_dump()
+    def to_dict(self):
+        return self.model_dump()
 
 
 def validate_process_excel_request(func: callable) -> callable:
@@ -36,25 +37,24 @@ def validate_process_excel_request(func: callable) -> callable:
 
         file = request.files.get('file')
         instructions = request.form['instructions']
-        print(instructions)
 
         if file.filename == '':
             return jsonify({"error": "No selected file"}), 400
-		
+
         if instructions:
             params = parse_params_from_instructions(instructions)
             if not params:
                 return jsonify({"error": "Invalid instructions"}), 400
-            res = validate_params_from_instructions(params)
+            validate_params_from_instructions(params)
         
-        return f(file, instructions, *args, **kwargs)
+        return func(file, instructions, *args, **kwargs)
     return decorated_function
 
 
 def parse_params_from_instructions(instructions: str):
     """
     Parse the parameters from the instructions
-	"""
+    """
     client = genai.Client(api_key=os.environ.get('GEMINI_FLASH_API_KEY'))
     response = client.models.generate_content(
         model='gemini-2.0-flash',
