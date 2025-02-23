@@ -5,6 +5,7 @@ import json
 import os
 from functools import wraps
 
+import pandas as pd
 from flask import request, jsonify
 from google import genai
 from pydantic import BaseModel, Field
@@ -75,3 +76,17 @@ def validate_params_from_instructions(params: dict) -> dict:
     output = Parameters(**params)
     logger.debug(f"output: {output.to_dict()}")
     return output.to_dict()
+
+
+def extract_excel_metadata(file_stream):
+    """Extract sheet names, column names, and data types from an uploaded Excel file."""
+    metadata = {}
+    xls = pd.ExcelFile(file_stream)
+    for sheet in xls.sheet_names:
+        df = pd.read_excel(xls, sheet_name=sheet, nrows=5)  # Read only first few rows to find out dt
+        metadata[sheet] = {
+            "columns": list(df.columns),
+            "data_types": df.dtypes.apply(lambda x: str(x)).to_dict()
+        }
+    logger.debug(f"metadata of uploaded excel file:: {metadata}")
+    return metadata
