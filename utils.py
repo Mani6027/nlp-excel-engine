@@ -7,10 +7,12 @@ from functools import wraps
 
 import google.generativeai as genai
 import pandas as pd
-from flask import request, jsonify, g
+from flask import request, g
 from pydantic import BaseModel, Field, model_validator
 
 from config import logger
+from constants import ErrorCodes
+from errors import InvalidInstructionException, InvalidFileException, InvalidParametersException
 from system_prompt import INITIAL_PROMPT, EXCEL_PARAM_EXTRACTION_PROMPT
 
 
@@ -39,22 +41,20 @@ def validate_process_excel_request(func: callable) -> callable:
     """
     @wraps(func)
     def decorated_function(*args, **kwargs):
-        logger.debug(f"file:: {request.files}")
-        logger.debug(f"form:: {request.form}")
         if 'file' not in request.files or 'instructions' not in request.form:
-            return jsonify({"error": "File and instructions are required"}), 400
+            raise InvalidParametersException(error_code=ErrorCodes.INVALID_PARAMETERS)
 
         file = request.files.get('file')
         instructions = request.form['instructions']
 
         if file.filename == '':
-            return jsonify({"error": "No selected file"}), 400
+            raise InvalidFileException(error_code=ErrorCodes.INVALID_FILE)
 
         if instructions:
             excel_metadata = extract_excel_metadata(file)
             params = extract_params_from_instructions(excel_metadata, instructions)
             if not params:
-                return jsonify({"error": "Invalid instructions"}), 400
+                raise InvalidInstructionException(error_code=ErrorCodes.INVALID_INSTRUCTION)
             validated_params = validate_params_from_instructions(params)
             g.params = validated_params
         return func(*args, **kwargs)

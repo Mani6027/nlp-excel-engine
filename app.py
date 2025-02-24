@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, send_file, g, request
 
 from core import Engine
+from errors import CustomBaseException
 from utils import validate_process_excel_request
 from config import logger
 
@@ -9,6 +10,13 @@ from config import logger
 load_dotenv()
 
 app = Flask(__name__)
+
+@app.errorhandler(CustomBaseException)
+def handle_custom_exception(error):
+    """
+        Handle custom exceptions
+    """
+    return jsonify(error.to_dict()), error.status_code
 
 
 @app.route('/health')

@@ -1,5 +1,5 @@
 class Operations:
-
+    """Available operations for the engine."""
     # available math operations
     ADDITION = 'addition'
     SUBTRACTION = 'subtraction'
@@ -9,7 +9,6 @@ class Operations:
     # NLP operations
     SENTIMENT_ANALYSIS = 'sentiment_analysis'
     SUMMARIZATION = 'summarization'
-    TEXT_CLASSIFICATION = 'text_classification'
 
     # Pivot and unpivot operations
     PIVOT_TABLE = 'pivot_table'
@@ -25,9 +24,37 @@ class Operations:
     # date operations
     DATE_DIFFERENCE = 'date_difference'
 
+    ######### Misc ########
     DF_JOIN_MAPPER = {
         INNER_JOIN: 'inner',
         LEFT_JOIN: 'left',
         RIGHT_JOIN: 'right',
         FULL_OUTER_JOIN: 'outer'
     }
+
+
+class ErrorCodes:
+    """Error codes for custom exceptions."""
+    INVALID_FILE = "INVALID_FILE"
+    INVALID_INSTRUCTION = "INVALID_INSTRUCTION"
+    INVALID_OPERATION = "INVALID_OPERATION"
+    INVALID_COLUMN = "INVALID_COLUMN"
+    INVALID_SHEET = "INVALID_SHEET"
+    INVALID_PARAMETERS = "INVALID_PARAMETERS"
+
+
+class ErrorMessages:
+    """Error messages for custom exceptions."""
+    INVALID_FILE = "Invalid file. Upload a valid Excel file."
+    INVALID_INSTRUCTION = "Invalid instruction. Provide a valid instruction."
+    INVALID_OPERATION = "Invalid operation. Provide a valid operation."
+    INVALID_COLUMN = "Invalid column. Provide a valid column."
+    INVALID_SHEET = "Invalid sheet. Provide a valid sheet."
+    INVALID_PARAMETERS = "Invalid parameters. Provide valid parameters."
+
+
+class StatusCodes:
+    """Status codes for custom exceptions."""
+    BAD_REQUEST = 400
+    INTERNAL_SERVER_ERROR = 500
+    NOT_FOUND = 404
