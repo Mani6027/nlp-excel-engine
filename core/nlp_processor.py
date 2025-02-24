@@ -65,13 +65,13 @@ class Summarizer:
         summaries = await self.__process_chunks(chunks)
         return summaries
 
-    async def __summarize(self, data_list: list[str]) -> str:
+    async def __summarize(self, data_list: list[str]) -> list[str]:
         """Summarizes the text from a list of strings."""
         initial_summaries = await self.__summarize_chunks(data_list)
         final_summary = await self.__summarize_chunks(initial_summaries)
-        return final_summary[0]
+        return final_summary
 
-    def summarize(self, data_list: list[str]) -> str:
+    def summarize(self, data_list: list[str]) -> list[str]:
         """Summarizes the text from a list of strings."""
         return asyncio.run(self.__summarize(data_list))
 
@@ -183,13 +183,17 @@ class NLPTaskExecutor:
         """
             Summarize the sentence from the given column. Add result in a separate column.
         """
-        data_list = df[column].tolist()
+        if column not in df.columns:
+            raise EmptyColumnException(column_name=column)
+
+        data_list = df[column].dropna().tolist()
 
         if not data_list:
             raise EmptyColumnException(column_name=column)
 
         summary = self._summarizer.summarize(data_list)
-        df[f'Summarized_{column}'] = summary
+        print(summary)
+        df[f'Summarized_{column}'] = pd.Series(summary[:len(data_list)]).reindex(df.index)
         return df
 
     def execute(self, df: pd.DataFrame, metadata: dict) -> pd.DataFrame:
@@ -199,5 +203,5 @@ class NLPTaskExecutor:
         operations = metadata.get('operation')
         if operations == Operations.SUMMARIZATION:
             return self.summarization(df, metadata.get('columns')[0])
-        elif operations == Operations.TEXT_CLASSIFICATION:
+        elif operations == Operations.SENTIMENT_ANALYSIS:
             return self.sentiment_analysis(df, metadata.get('columns')[0])

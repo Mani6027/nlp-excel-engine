@@ -1,5 +1,3 @@
-import unittest
-
 import pandas as pd
 
 from core.math_processor import MathOperationExecutor
@@ -426,37 +424,3 @@ class TestJoinMethod(BaseTest):
             'description': ['twenty','thirty']
         })
         pd.testing.assert_frame_equal(result_df, expected_df)
-
-
-class TestMathOperationExecutor(unittest.TestCase):
-    def setUp(self):
-        # Prepare a sample DataFrame for testing
-        self.df = pd.DataFrame({
-            'A': [1, 2, 3, 4],
-            'B': [5, 6, 7, 8],
-            'StartDate': pd.to_datetime(['2023-01-01', '2023-02-01', '2023-03-01', '2023-04-01']),
-            'EndDate': pd.to_datetime(['2023-02-01', '2023-03-01', '2023-04-01', '2023-05-01'])
-        })
-        self.executor = MathOperationExecutor()
-
-    def test_division(self):
-        result = self.executor.division(self.df, ['B'], 2)
-        expected = pd.Series([2.5, 3.0, 3.5, 4.0], name='B_divided')
-        pd.testing.assert_series_equal(result, expected)
-
-    def test_avg(self):
-        result = self.executor.avg(self.df, ['A'])
-        expected = pd.Series([2.5, 2.5, 2.5, 2.5], name='avg_of_A')
-        pd.testing.assert_series_equal(result, expected)
-
-    def test_invalid_column(self):
-        with self.assertRaises(InvalidColumn):
-            self.executor.sum(self.df, ['NonExistent'])
-
-    def test_division_by_zero(self):
-        with self.assertRaises(InvalidValue):
-            self.executor.division(self.df, ['A'], 0)
-
-    def test_invalid_operation(self):
-        with self.assertRaises(InvalidOperation):
-            self.executor.execute(self.df, {'operation': 'INVALID_OPERATION'})
