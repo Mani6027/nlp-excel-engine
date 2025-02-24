@@ -52,7 +52,7 @@ class Engine:
         df = self._file_handler.df_dict.get(self._metadata.get('sheets')[0])
 
         if (self._metadata.get('operation') in
-                {Operations.SENTIMENT_ANALYSIS, Operations.SUMMARIZATION, Operations.TEXT_CLASSIFICATION}):
+                {Operations.SENTIMENT_ANALYSIS, Operations.SUMMARIZATION}):
             self._nlp_operation_executor.execute(df, self._metadata)
         elif self._metadata.get('operation') == Operations.OPERATION_JOIN:
             right_df = self._file_handler.df_dict.get(self._metadata.get('sheets')[1])

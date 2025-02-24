@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
-from flask import Flask, jsonify, send_file
+from flask import Flask, jsonify, send_file, g, request
 
+from core import Engine
 from utils import validate_process_excel_request
 from config import logger
 
@@ -8,6 +9,7 @@ from config import logger
 load_dotenv()
 
 app = Flask(__name__)
+
 
 @app.route('/health')
 def health_check():
@@ -23,10 +25,11 @@ def process_excel():
     """
     Process Excel endpoint
     """
-    # call the function to process the excel file
+    core = Engine(g.params, request.files['file'])
+    core.execute()
 
-    # return send_file("", attachment_filename="placeholder_name.xlsx", as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    return jsonify({"status": "success"}), 200
+    return send_file("./output.xlsx", download_name="output.xlsx", as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 if __name__ == '__main__':
     logger.info("Starting the server...")
