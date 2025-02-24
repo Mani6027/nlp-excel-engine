@@ -8,6 +8,8 @@ class Operations:
     DIVISION = 'division'
     AVG = 'avg'
 
+    ALL_MATH_OPERATIONS = [ADDITION, SUMMATION, SUBTRACTION, MULTIPLICATION, DIVISION, AVG]
+
     # NLP operations
     SENTIMENT_ANALYSIS = 'sentiment_analysis'
     SUMMARIZATION = 'summarization'

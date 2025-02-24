@@ -9,19 +9,19 @@ import pandas as pd
 from constants import Operations, ErrorCodes
 from custom_exceptions import LLMRaisedException, EmptyColumnException
 
-
-class Summarizer:
-
+class BaseNLModel:
     def __init__(self, gemini_model_name: str = "gemini-2.0-flash", chunk_size: int = 100):
         self._api_key = os.environ.get('GEMINI_FLASH_API_KEY')
         self._model_name = gemini_model_name
         self.chunk_size = chunk_size
         self._api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self._model_name}:generateContent?key={self._api_key}"
 
-    def __chunk_data(self, data_list):
+    def chunk_data(self, data_list):
         """Splits the data list into smaller chunks."""
         return [data_list[i:i + self.chunk_size] for i in range(0, len(data_list), self.chunk_size)]
 
+
+class Summarizer(BaseNLModel):
     @staticmethod
     def __format_payload(chunk: list[str]) -> dict:
         """Formats the payload for the LLM API call."""
@@ -61,7 +61,7 @@ class Summarizer:
 
     async def __summarize_chunks(self, data_list: list[str]) -> list[str]:
         """Summarizes the text from a list of strings in chunks."""
-        chunks = self.__chunk_data(data_list)
+        chunks = self.chunk_data(data_list)
         summaries = await self.__process_chunks(chunks)
         return summaries
 
@@ -75,14 +75,8 @@ class Summarizer:
         """Summarizes the text from a list of strings."""
         return asyncio.run(self.__summarize(data_list))
 
-class TextClassifier:
 
-    def __init__(self, gemini_model_name: str = "gemini-2.0-flash", chunk_size: int = 100):
-        self._api_key = os.environ.get('GEMINI_FLASH_API_KEY')
-        self._model_name = gemini_model_name
-        self.chunk_size = chunk_size
-        self._api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self._model_name}:generateContent?key={self._api_key}"
-
+class TextClassifier(BaseNLModel):
     def __chunk_data(self, data_list):
         """Splits the data list into smaller chunks."""
         return [data_list[i:i + self.chunk_size] for i in range(0, len(data_list), self.chunk_size)]
@@ -136,7 +130,7 @@ class TextClassifier:
 
     async def __classify(self, data_list: list[str]) -> list[list[dict[str, Any]]]:
         """Summarizes the text from a list of strings in chunks."""
-        chunks = self.__chunk_data(data_list)
+        chunks = self.chunk_data(data_list)
         summaries = await self.__process_chunks(chunks)
         return summaries
 

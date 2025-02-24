@@ -295,15 +295,31 @@ class MathOperationExecutor:
             result = pd.DataFrame({f'avg_of_{column}': [avg_value]})
         return result
 
-    def execute(self, df: pd.DataFrame, metadata: dict, right_df = None) -> Union[pd.DataFrame, pd.Series, float]:
-        """
-            Method to execute a math operation based on operation type and its arguments.
+    def _handle_pivot_table(self, df: pd.DataFrame, metadata: dict) -> pd.DataFrame:
+        return self.pivot(df, metadata.get('index_column'), metadata.get('values_column'),
+                          metadata.get('aggregation_function'))
 
-        :param df: DataFrame to perform the operation on
-        :param metadata: Metadata containing operation type and its arguments
-        :param right_df: Optional right DataFrame for join operations
-        :return: Result of the operation
-        """
+    def _handle_unpivot_table(self, df: pd.DataFrame, metadata: dict) -> pd.DataFrame:
+        return self.unpivot(df, metadata.get("id_vars"), metadata.get("var_name"), metadata.get("value_name"))
+
+    def _handle_join(self, left_df: pd.DataFrame, right_df: pd.DataFrame, metadata: dict) -> pd.DataFrame:
+        join_type = metadata.get("parameters", {}).get("join_type")
+        on = metadata.get("parameters", {}).get("on")
+        how = Operations.DF_JOIN_MAPPER.get(join_type)
+        return self.join(left_df, right_df=right_df, how=how, on=on)
+
+    def _get_operation_method(self, operation):
+        operation_mapper = {
+            Operations.ADDITION: self.sum,  # Alias for summation
+            Operations.SUMMATION: self.sum,
+            Operations.SUBTRACTION: self.subtraction,
+            Operations.MULTIPLICATION: self.multiplication,
+            Operations.DIVISION: self.division,
+        }
+        return operation_mapper[operation]
+
+    @staticmethod
+    def _get_value_key(operation):
         value_mapper = {
             Operations.ADDITION: 'add_value',
             Operations.SUMMATION: 'sum_value',
@@ -311,41 +327,35 @@ class MathOperationExecutor:
             Operations.MULTIPLICATION: 'multiply_value',
             Operations.DIVISION: 'divide_value'
         }
+        return value_mapper.get(operation)
 
-        operation_mapper = {
-            Operations.ADDITION: self.sum, # alias for summation
-            Operations.SUMMATION: self.sum,
-            Operations.SUBTRACTION: self.subtraction,
-            Operations.MULTIPLICATION: self.multiplication,
-            Operations.DIVISION: self.division,
-            Operations.PIVOT_TABLE: self.pivot,
-            Operations.UNPIVOT_TABLE: self.unpivot,
-            Operations.AVG: self.avg
-        }
+    def execute(self, df: pd.DataFrame, metadata: dict, right_df=None) -> Union[pd.DataFrame, pd.Series, float]:
+        """
+        Method to execute a math operation based on operation type and its arguments.
 
+        :param df: DataFrame to perform the operation on
+        :param metadata: Metadata containing operation type and its arguments
+        :param right_df: Optional right DataFrame for join operations
+        :return: Result of the operation
+        """
         operation = metadata['operation']
-        if operation not in operation_mapper:
+        columns = metadata.get('columns')
+
+        if operation not in Operations.ALL_MATH_OPERATIONS:
             raise InvalidOperation(message=f"Unknown operation: {operation}", error_code=ErrorCodes.INVALID_OPERATION)
 
-        columns = metadata.get('columns')
-        method = operation_mapper[operation]
-
         if operation == Operations.PIVOT_TABLE:
-            return self.pivot(df, metadata.get('index_column'),
-                          metadata.get('values_column'), metadata.get('aggregation_function'))
-
+            return self._handle_pivot_table(df, metadata)
         if operation == Operations.UNPIVOT_TABLE:
-            return self.unpivot(df, metadata.get("id_vars"), metadata.get("var_name"), metadata.get("value_name"))
-
+            return self._handle_unpivot_table(df, metadata)
         if operation == Operations.OPERATION_JOIN:
-            join_type = metadata.get("parameters", {}).get("join_type")
-            on = metadata.get("parameters", {}).get("on")
-            how = Operations.DF_JOIN_MAPPER.get(join_type)
-            return self.join(df, right_df=right_df, how=how, on=on)
+            return self._handle_join(df, right_df, metadata)
         if operation == Operations.DATE_DIFFERENCE:
-            self.date_difference(df, metadata.get('columns')[0], metadata.get('columns')[1], metadata.get('parameters').get('unit'))
+            return self.date_difference(df, metadata.get('columns')[0], metadata.get('columns')[1],
+                                        metadata.get('parameters', {}).get('unit'))
         if operation == Operations.AVG:
-            return self.avg(df, metadata.get('columns'), metadata.get('parameters', {}).get('group_by'))
-        if operation == Operations.SUMMATION:
-            return self.sum(df, metadata.get('columns'), metadata.get('parameters', {}).get('sum_value'))
-        return method(df, columns, metadata.get(value_mapper.get(operation)))
+            return self.avg(df, columns, metadata.get('parameters', {}).get('group_by'))
+
+        # Default handling for mathematical operations
+        method = self._get_operation_method(operation)
+        return method(df, columns, metadata.get(self._get_value_key(operation)))
