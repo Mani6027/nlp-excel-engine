@@ -133,8 +133,10 @@ class MathOperationExecutor:
         new_column_name = ''.join(columns) + '_sum'
         if value is not None:
             df[new_column_name] = df[columns].sum() + value
+        if len(columns) > 1:
+            df[new_column_name] = df[columns].sum()
         else:
-            df[new_column_name] = df[columns].sum(axis=1)
+            df[new_column_name] = df[columns[0]].sum()
 
         return df[new_column_name]
 
@@ -198,6 +200,25 @@ class MathOperationExecutor:
             df[new_column_name] = df[columns[0]] / value
             return df[new_column_name]
 
+    def avg(self, df: pd.DataFrame, columns: List[str], group_by: str = None):
+        """
+            Average operation on specified column
+
+        :param df: DataFrame to perform the operation on
+        :param columns: List of column names to perform the operation on
+        :param group_by: Column to group by
+        :return: Average of the specified column
+        """
+        for column in columns:
+            self.__check_column_exists(df, column)
+
+        if group_by:
+            df[f'avg_of_{columns[0]}'] = df.groupby(group_by)[columns[0]].mean()
+        else:
+            df[f'avg_of_{columns[0]}'] = df[columns[0]].mean()
+
+        return df[f'avg_of_{columns[0]}']
+
     def execute(self, df: pd.DataFrame, metadata: dict, right_df = None) -> Union[pd.DataFrame, pd.Series, float]:
         """
             Method to execute a math operation based on operation type and its arguments.
@@ -209,18 +230,21 @@ class MathOperationExecutor:
         """
         value_mapper = {
             Operations.ADDITION: 'add_value',
+            Operations.SUMMATION: 'sum_value',
             Operations.SUBTRACTION: 'subtract_value',
             Operations.MULTIPLICATION: 'multiply_value',
             Operations.DIVISION: 'divide_value'
         }
 
         operation_mapper = {
-            Operations.ADDITION: self.sum,
+            Operations.ADDITION: self.sum, # alias for summation
+            Operations.SUMMATION: self.sum,
             Operations.SUBTRACTION: self.subtraction,
             Operations.MULTIPLICATION: self.multiplication,
             Operations.DIVISION: self.division,
             Operations.PIVOT_TABLE: self.pivot,
             Operations.UNPIVOT_TABLE: self.unpivot,
+            Operations.AVG: self.avg
         }
 
         operation = metadata['operation']
@@ -244,4 +268,8 @@ class MathOperationExecutor:
             return self.join(df, right_df=right_df, how=how, on=on)
         if operation == Operations.DATE_DIFFERENCE:
             self.date_difference(df, metadata.get('columns')[0], metadata.get('columns')[1], metadata.get('parameters').get('unit'))
-        return method(df, columns, metadata.get(value_mapper[operation]))
+        if operation == Operations.AVG:
+            return self.avg(df, metadata.get('columns'), metadata.get('parameters', {}).get('group_by'))
+        if operation == Operations.SUMMATION:
+            return self.sum(df, metadata.get('columns'), metadata.get('parameters', {}).get('sum_value'))
+        return method(df, columns, metadata.get(value_mapper.get(operation)))

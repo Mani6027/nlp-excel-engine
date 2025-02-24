@@ -1,5 +1,6 @@
 import pandas as pd
 
+from config import logger
 from constants import Operations
 from core.math_processor import MathOperationExecutor
 from core.nlp_processor import NLPTaskExecutor
@@ -34,6 +35,7 @@ class FileHandler:
         with pd.ExcelWriter(save_path, engine='openpyxl', mode='w') as writer:
             for sheet_name, df in self.__load_df.items():
                 df.to_excel(writer, sheet_name=sheet_name, index=False)
+        logger.info(f"File saved to {save_path}")
 
 
 class Engine:

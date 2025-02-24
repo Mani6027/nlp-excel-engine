@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, model_validator
 from config import logger
 from constants import ErrorCodes
 from custom_exceptions import InvalidParameters, InvalidInstruction, InvalidFile
-from system_prompt import INITIAL_PROMPT, EXCEL_PARAM_EXTRACTION_PROMPT
+from system_prompt import INITIAL_PROMPT, EXCEL_PARAM_EXTRACTION_PROMPT, EXCEL_PARAM_EXTRACTION_PROMPT_V2, OBJ_PROMPT_V2
 
 
 # create a schema for parameters checking from instructions
@@ -73,7 +73,7 @@ def extract_params_from_instructions(excel_metadata, instructions: str) -> dict:
         "max_output_tokens": 8192,
         "response_mime_type": "application/json",
     }
-    system_prompt = INITIAL_PROMPT.format(excel_metadata=excel_metadata) + EXCEL_PARAM_EXTRACTION_PROMPT
+    system_prompt = OBJ_PROMPT_V2.format(excel_metadata=excel_metadata) + EXCEL_PARAM_EXTRACTION_PROMPT_V2
     model = genai.GenerativeModel(
         "gemini-2.0-flash",
         generation_config=generation_config,

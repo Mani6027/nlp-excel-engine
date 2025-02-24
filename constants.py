@@ -2,9 +2,11 @@ class Operations:
     """Available operations for the engine."""
     # available math operations
     ADDITION = 'addition'
+    SUMMATION = 'summation'
     SUBTRACTION = 'subtraction'
     MULTIPLICATION = 'multiplication'
     DIVISION = 'division'
+    AVG = 'avg'
 
     # NLP operations
     SENTIMENT_ANALYSIS = 'sentiment_analysis'
