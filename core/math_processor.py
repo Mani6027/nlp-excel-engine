@@ -3,8 +3,9 @@ from typing import Union, List
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 
+from config import logger
 from constants import Operations, ErrorCodes
-from custom_exceptions import InvalidColumn, InvalidValue, InvalidOperation
+from custom_exceptions import InvalidColumn, InvalidValue, InvalidOperation, InvalidInstruction
 
 
 class MathOperationExecutor:
@@ -58,7 +59,7 @@ class MathOperationExecutor:
             return df['Day_diff']
         elif unit == 'months':
             return self.__calculate_dt_difference_in_months(df, column_start, column_end)
-        elif unit == 'year':
+        elif unit == 'years':
             return self.__calculate_dt_difference_in_years(df, column_start, column_end)
         raise InvalidValue(message=f"Invalid time unit: {unit}", error_code=ErrorCodes.INVALID_VALUE)
 
@@ -127,16 +128,23 @@ class MathOperationExecutor:
         :param value: Value to add with
         :return: Sum of the specified column
         """
+        num_columns = []
         for column in columns:
             self.__check_column_exists(df, column)
+            if pd.api.types.is_numeric_dtype(df[column]):
+                num_columns.append(column)
+            else:
+                logger.warning(f"Non-numeric column '{column}' included in sum operation. Ignoring it.")
 
-        new_column_name = ''.join(columns) + '_sum'
+        if len(num_columns) == 0:
+            raise InvalidColumn(message="Provide at least one numeric column.", error_code=ErrorCodes.INVALID_COLUMN)
+
+        new_column_name = ''.join(num_columns) + '_sum'
+        df[new_column_name] = (df[num_columns].sum(axis=1)
+                               if len(num_columns) > 1 else df[num_columns[0]]).astype(float)
+
         if value is not None:
-            df[new_column_name] = df[columns].sum() + value
-        if len(columns) > 1:
-            df[new_column_name] = df[columns].sum()
-        else:
-            df[new_column_name] = df[columns[0]].sum()
+            df[new_column_name] += value
 
         return df[new_column_name]
 
@@ -149,16 +157,36 @@ class MathOperationExecutor:
         :param value: Value to subtract with
         :return: Subtraction of the specified columns
         """
+        if not columns:
+            raise InvalidInstruction(message="Please specify column name to subtract.",
+                                     error_code=ErrorCodes.INVALID_INSTRUCTION)
+
+        if len(columns) > 2:
+            raise InvalidInstruction(message="Too many columns provided for subtraction. Max 2 allowed.",
+                                     error_code=ErrorCodes.OPERATION_NOT_SUPPORTED)
+
         for column in columns:
             self.__check_column_exists(df, column)
+            if not pd.api.types.is_numeric_dtype(df[column]):
+                # Can we handle this case like sum operation?
+                raise InvalidColumn(message=f"Non-numeric column '{column}' cannot be used for subtraction.",
+                                    error_code=ErrorCodes.INVALID_COLUMN)
 
-        if value is not None:
-            return df[columns].sum() - value
+        if len(columns) == 1 and value is not None:
+            new_column_name = f"{columns[0]}_subtracted_by_{value}"
+            df[new_column_name] = df[columns[0]] - value
+        elif len(columns) == 2 and value is None:
+            new_column_name = f"{columns[0]}_minus_{columns[1]}"
+            df[new_column_name] = df[columns[0]] - df[columns[1]]
+        else:
+            raise InvalidValue(
+                error_code=ErrorCodes.INVALID_INSTRUCTION,
+                message="Invalid parameters for subtraction. Provide either one column and a value, or two columns."
+            )
 
-        df['subtracted result'] = df[columns[0]] - df[columns[1]]
-        return df['subtracted result']
+        return df[new_column_name]
 
-    def multiplication(self, df: pd.DataFrame, columns: List[str], value: Union[int, float]):
+    def multiplication(self, df: pd.DataFrame, columns: List[str], value: Union[int, float] = None):
         """
             Multiplication on number/numeric column with the given value
 
@@ -167,13 +195,27 @@ class MathOperationExecutor:
         :param value: Value to multiply with
         :return: Multiplication of the specified column with the given value
         """
+        if not columns:
+            raise InvalidInstruction(message="Please specify column name to multiply.",
+                                     error_code=ErrorCodes.INVALID_INSTRUCTION)
+
         for column in columns:
             self.__check_column_exists(df, column)
+            if not pd.api.types.is_numeric_dtype(df[column]):
+                raise InvalidColumn(message=f"Column '{column}' is not numeric and cannot be used for multiplication.",
+                                    error_code=ErrorCodes.OPERATION_NOT_SUPPORTED)
 
-        new_column_name = ''.join(columns) + '_multiplied'
         if value is not None:
-            df[new_column_name] = df[columns] * value
+            # Case: Multiplying each column by a constant value
+            new_column_name = '_and_'.join(columns) + f'_multiplied_by_{value}'
+            df[new_column_name] = df[columns].prod(axis=1) * value if len(columns) > 1 else df[columns[0]] * value
         else:
+            # Case: Multiplying values across columns element-wise
+            if len(columns) < 2:
+                raise InvalidInstruction(
+                    message="At least two columns must be specified for element-wise multiplication.",
+                    error_code=ErrorCodes.INVALID_INSTRUCTION)
+            new_column_name = '_and_'.join(columns)
             df[new_column_name] = df[columns].prod(axis=1)
 
         return df[new_column_name]
