@@ -74,15 +74,24 @@ class MathOperationExecutor:
         :param on: Column name(s) to join on
         :return: The resultant joined DataFrame
         """
-        if not right_df:
-            raise ValueError("Right DataFrame is required for join operation.")
+        if right_df is None:
+            raise InvalidInstruction("Specify right sheet for join operation.", ErrorCodes.INVALID_INSTRUCTION)
 
         if isinstance(on, str):
             on = [on]
 
-        for column in on:
-            self.__check_column_exists(left_df, column)
-            self.__check_column_exists(right_df, column)
+        missing_columns = [column for column in on if column not in left_df.columns or column not in right_df.columns]
+        if missing_columns:
+            raise InvalidColumn(
+                f"Column(s) {', '.join(missing_columns)} do not exist in provided DataFrames.",
+                error_code=ErrorCodes.INVALID_COLUMN
+            )
+
+        if how not in {'inner', 'left', 'right', 'outer'}:
+            raise InvalidOperation(
+                f"Please provide one of 'inner', 'left', 'right', or 'outer'.",
+                error_code=ErrorCodes.INVALID_OPERATION
+            )
 
         return pd.merge(left_df, right_df, how=how, on=on)
 

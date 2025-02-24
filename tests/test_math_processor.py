@@ -281,6 +281,63 @@ class TestAvgMethod(BaseTest):
         pd.testing.assert_frame_equal(result, expected_df)
 
 
+class TestJoinMethod(BaseTest):
+    def setUp(self):
+        self.executor = MathOperationExecutor()
+        self.left_df = pd.DataFrame({
+            'id': [1, 2, 3],
+            'value': [10, 20, 30]
+        })
+        self.right_df = pd.DataFrame({
+            'id': [2, 3, 4],
+            'description': ['twenty', 'thirty', 'forty']
+        })
+
+    def test_join_inner(self):
+        result_df = self.executor.join(self.left_df, self.right_df, 'inner', 'id')
+        expected_df = pd.DataFrame({
+            'id': [2, 3],
+            'value': [20, 30],
+            'description': ['twenty', 'thirty']
+        })
+        pd.testing.assert_frame_equal(result_df, expected_df)
+
+    def test_join_left(self):
+        result_df = self.executor.join(self.left_df, self.right_df, 'left', 'id')
+        expected_df = pd.DataFrame({
+            'id': [1, 2, 3],
+            'value': [10, 20, 30],
+            'description': [None, 'twenty', 'thirty']
+        })
+        pd.testing.assert_frame_equal(result_df, expected_df)
+
+    def test_join_with_nonexistent_columns(self):
+        with self.assertRaises(InvalidColumn):
+            self.executor.join(self.left_df, self.right_df, 'inner', 'nonexistent_column')
+
+    def test_join_with_none_dataframe(self):
+        with self.assertRaises(InvalidInstruction):
+            self.executor.join(self.left_df, None, 'inner', 'id')
+
+    def test_join_with_invalid_join_type(self):
+        with self.assertRaises(InvalidOperation):
+            self.executor.join(self.left_df, self.right_df, 'invalid_join_type', 'id')
+
+    def test_join_multiple_columns(self):
+        extended_left_df = self.left_df.copy()
+        extended_left_df['extra'] = ['a', 'b', 'c']
+        extended_right_df = self.right_df.copy()
+        extended_right_df['extra'] = ['b', 'c', 'd']
+        result_df = self.executor.join(extended_left_df, extended_right_df, 'inner', ['id', 'extra'])
+        expected_df = pd.DataFrame({
+            'id': [2, 3],
+            'value': [20, 30],
+            'extra': ['b', 'c'],
+            'description': ['twenty','thirty']
+        })
+        pd.testing.assert_frame_equal(result_df, expected_df)
+
+
 class TestMathOperationExecutor(unittest.TestCase):
     def setUp(self):
         # Prepare a sample DataFrame for testing
