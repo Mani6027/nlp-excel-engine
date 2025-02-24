@@ -7,11 +7,13 @@ from functools import wraps
 
 import google.generativeai as genai
 import pandas as pd
-from flask import request, jsonify
+from flask import request, g
 from pydantic import BaseModel, Field, model_validator
 
 from config import logger
-from system_prompt import INITIAL_PROMPT, EXCEL_PARAM_EXTRACTION_PROMPT
+from constants import ErrorCodes
+from custom_exceptions import InvalidParameters, InvalidInstruction, InvalidFile
+from system_prompt import INITIAL_PROMPT, EXCEL_PARAM_EXTRACTION_PROMPT, EXCEL_PARAM_EXTRACTION_PROMPT_V2, OBJ_PROMPT_V2
 
 
 # create a schema for parameters checking from instructions
@@ -40,22 +42,22 @@ def validate_process_excel_request(func: callable) -> callable:
     @wraps(func)
     def decorated_function(*args, **kwargs):
         if 'file' not in request.files or 'instructions' not in request.form:
-            return jsonify({"error": "File and instructions are required"}), 400
+            raise InvalidParameters(error_code=ErrorCodes.INVALID_PARAMETERS)
 
         file = request.files.get('file')
         instructions = request.form['instructions']
 
         if file.filename == '':
-            return jsonify({"error": "No selected file"}), 400
+            raise InvalidFile(error_code=ErrorCodes.INVALID_FILE)
 
         if instructions:
             excel_metadata = extract_excel_metadata(file)
             params = extract_params_from_instructions(excel_metadata, instructions)
             if not params:
-                return jsonify({"error": "Invalid instructions"}), 400
-            validate_params_from_instructions(params)
-        
-        return func(file, instructions, *args, **kwargs)
+                raise InvalidInstruction(error_code=ErrorCodes.INVALID_INSTRUCTION)
+            validated_params = validate_params_from_instructions(params)
+            g.params = validated_params
+        return func(*args, **kwargs)
     return decorated_function
 
 
@@ -71,7 +73,7 @@ def extract_params_from_instructions(excel_metadata, instructions: str) -> dict:
         "max_output_tokens": 8192,
         "response_mime_type": "application/json",
     }
-    system_prompt = INITIAL_PROMPT.format(excel_metadata=excel_metadata) + EXCEL_PARAM_EXTRACTION_PROMPT
+    system_prompt = OBJ_PROMPT_V2.format(excel_metadata=excel_metadata) + EXCEL_PARAM_EXTRACTION_PROMPT_V2
     model = genai.GenerativeModel(
         "gemini-2.0-flash",
         generation_config=generation_config,
@@ -80,7 +82,7 @@ def extract_params_from_instructions(excel_metadata, instructions: str) -> dict:
     chat_session = model.start_chat(history=[])
     _response = chat_session.send_message(instructions)
     _response = _response.text
-    logger.debug(f"response from gemini: {_response}")
+    logger.info(f"response from gemini: {_response}")
     return json.loads(_response)
 
 

@@ -2,10 +2,10 @@ services:
   web:
     build: .
     ports:
-      - "5001:5000"
+      - "5001:5001"
     volumes:
       - .:/app  # Bind mount the current directory to /app in the container
       - /app/__pycache__
     environment:
       FLASK_ENV: development
-    command: python app.py
+    command: flask run --host=0.0.0.0 --port=5001
