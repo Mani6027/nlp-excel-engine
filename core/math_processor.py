@@ -3,7 +3,8 @@ from typing import Union, List
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 
-from constants import Operations
+from constants import Operations, ErrorCodes
+from errors import InvalidColumn, InvalidValue, InvalidOperation
 
 
 class MathOperationExecutor:
@@ -19,7 +20,10 @@ class MathOperationExecutor:
         :param column: Column name to check
         """
         if column not in df.columns:
-            raise ValueError(f"Column '{column}' does not exist in DataFrame.")
+            raise InvalidColumn(
+                message=f"Column '{column}' does not exist in DataFrame.",
+                error_code=ErrorCodes.INVALID_COLUMN
+            )
 
     @staticmethod
     def __calculate_dt_difference_in_months(df, column_start, column_end):
@@ -56,8 +60,7 @@ class MathOperationExecutor:
             return self.__calculate_dt_difference_in_months(df, column_start, column_end)
         elif unit == 'year':
             return self.__calculate_dt_difference_in_years(df, column_start, column_end)
-        else:
-            raise ValueError(f"Invalid time unit: {unit}")
+        raise InvalidValue(message=f"Invalid time unit: {unit}", error_code=ErrorCodes.INVALID_VALUE)
 
     def join(self, left_df: pd.DataFrame, right_df: pd.DataFrame,
              how: str, on: Union[str, List[str]]) -> pd.DataFrame:
@@ -186,7 +189,7 @@ class MathOperationExecutor:
             self.__check_column_exists(df, column)
 
         if value == 0:
-            raise ValueError("Division by zero is not allowed.")
+            raise InvalidValue(message="Division by zero is not allowed.", error_code=ErrorCodes.INVALID_VALUE)
 
         new_column_name = ''.join(columns) + '_divided'
 
@@ -222,7 +225,7 @@ class MathOperationExecutor:
 
         operation = metadata['operation']
         if operation not in operation_mapper:
-            raise ValueError(f"Unknown operation: {operation}")
+            raise InvalidOperation(message=f"Unknown operation: {operation}", error_code=ErrorCodes.INVALID_OPERATION)
 
         columns = metadata.get('columns')
         method = operation_mapper[operation]

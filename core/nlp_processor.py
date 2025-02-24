@@ -6,7 +6,9 @@ from typing import Any
 import aiohttp
 import pandas as pd
 
-from constants import Operations
+from constants import Operations, ErrorCodes
+from errors import LLMRaisedException, EmptyColumnException
+
 
 class Summarizer:
 
@@ -42,9 +44,10 @@ class Summarizer:
         }
         payload = self.__format_payload(chunk)
         async with aiohttp.ClientSession() as session:
-            async with session.post(self._api_url, headers=headers, data=payload) as response:
+            async with session.post(self._api_url, headers=headers, json=payload) as response:
                 if response.status != 200:
-                    raise Exception(f"Request failed: {response.status} - {await response.text()}")
+                    raise LLMRaisedException(message=f"Request failed: {response.status} - {await response.text()}",
+                                             error_code=ErrorCodes.LLM_RAISED_EXCEPTION)
                 result = await response.json()
                 for candidate in result.get("candidates", []):
                     for part in candidate.get("content", {}).get("parts", []):
@@ -155,7 +158,7 @@ class NLPTaskExecutor:
         """
         data_list = df[column].tolist()
         if not data_list:
-            raise ValueError("Given column is empty.")
+            raise EmptyColumnException(column_name=column)
         responses = self._text_classifier.classify(data_list)
 
         sentiment_dict = {}
@@ -183,7 +186,7 @@ class NLPTaskExecutor:
         data_list = df[column].tolist()
 
         if not data_list:
-            raise ValueError("Given column is empty.")
+            raise EmptyColumnException(column_name=column)
 
         summary = self._summarizer.summarize(data_list)
         df[f'Summarized_{column}'] = summary
