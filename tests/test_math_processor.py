@@ -281,6 +281,52 @@ class TestAvgMethod(BaseTest):
         pd.testing.assert_frame_equal(result, expected_df)
 
 
+class TestPivotMethod(BaseTest):
+    def setUp(self):
+        self.executor = MathOperationExecutor()
+        self.data = {
+            'Category': ['A', 'A', 'B', 'B', 'C'],
+            'Values': [100, 200, 150, 250, 300],
+            'Count': [1, 1, 1, 2, 1]
+        }
+        self.df = pd.DataFrame(self.data)
+
+    def test_pivot_sum(self):
+        result = self.executor.pivot(self.df, index_col='Category', value_col='Values', aggfunc='sum')
+        expected_data = {
+            'Category': ['A', 'B', 'C'],
+            'Values': [300, 400, 300]
+        }
+        expected_df = pd.DataFrame(expected_data)
+        pd.testing.assert_frame_equal(result, expected_df.reset_index(drop=True))
+
+    def test_pivot_mean(self):
+        result = self.executor.pivot(self.df, index_col='Category', value_col='Values', aggfunc='mean')
+        expected_data = {
+            'Category': ['A', 'B', 'C'],
+            'Values': [150.0, 200.0, 300.0]
+        }
+        expected_df = pd.DataFrame(expected_data)
+        pd.testing.assert_frame_equal(result, expected_df.reset_index(drop=True))
+
+    def test_pivot_with_nonexistent_index_column(self):
+        with self.assertRaises(InvalidColumn):
+            self.executor.pivot(self.df, index_col='Nonexistent', value_col='Values')
+
+    def test_pivot_with_nonexistent_value_column(self):
+        with self.assertRaises(InvalidColumn):
+            self.executor.pivot(self.df, index_col='Category', value_col='Nonexistent')
+
+    def test_pivot_with_invalid_aggfunc(self):
+        with self.assertRaises(InvalidOperation):
+            self.executor.pivot(self.df, index_col='Category', value_col='Values', aggfunc='invalid_func')
+
+    def test_pivot_with_empty_dataframe(self):
+        empty_df = pd.DataFrame(columns=['Category', 'Values'])
+        result = self.executor.pivot(empty_df, index_col='Category', value_col='Values', aggfunc='sum')
+        expected_df = pd.DataFrame(columns=['Category'])
+        pd.testing.assert_frame_equal(result, expected_df)
+
 class TestJoinMethod(BaseTest):
     def setUp(self):
         self.executor = MathOperationExecutor()

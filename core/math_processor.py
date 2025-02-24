@@ -105,11 +105,16 @@ class MathOperationExecutor:
         :param aggfunc: Aggregation function to use, default is 'sum'
         :return: A pivot table DataFrame
         """
-        # Check if all columns exist
         for column in [index_col, value_col]:
             self.__check_column_exists(df, column)
 
-        return pd.pivot_table(df, index=index_col, values=value_col, aggfunc=aggfunc)
+        valid_aggfuncs = {'sum', 'mean', 'max', 'min', 'count', 'prod'}
+        if aggfunc not in valid_aggfuncs:
+            raise InvalidOperation(f"Choose aggregation operations from: {', '.join(valid_aggfuncs)}.",
+                                   error_code=ErrorCodes.INVALID_OPERATION)
+
+        pivot_table = pd.pivot_table(df, index=index_col, values=value_col, aggfunc=aggfunc)
+        return pivot_table.reset_index()
 
     def unpivot(self, df: pd.DataFrame, id_vars: List[str],
                 var_name: str = "Metric", value_name: str = "Value") -> pd.DataFrame:
