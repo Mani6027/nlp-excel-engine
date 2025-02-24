@@ -206,11 +206,9 @@ class MathOperationExecutor:
                                     error_code=ErrorCodes.OPERATION_NOT_SUPPORTED)
 
         if value is not None:
-            # Case: Multiplying each column by a constant value
             new_column_name = '_and_'.join(columns) + f'_multiplied_by_{value}'
             df[new_column_name] = df[columns].prod(axis=1) * value if len(columns) > 1 else df[columns[0]] * value
         else:
-            # Case: Multiplying values across columns element-wise
             if len(columns) < 2:
                 raise InvalidInstruction(
                     message="At least two columns must be specified for element-wise multiplication.",
@@ -220,7 +218,7 @@ class MathOperationExecutor:
 
         return df[new_column_name]
 
-    def division(self, df: pd.DataFrame, columns: List[str], value: Union[int, float]) -> pd.Series:
+    def division(self, df: pd.DataFrame, columns: List[str], value: Union[int, float] = None) -> pd.Series:
         """
             Division on number/numeric column with the given value
 
@@ -229,18 +227,35 @@ class MathOperationExecutor:
         :param value: Value to divide with
         :return: Division of the specified column with the given value
         """
+        if not columns:
+            raise InvalidInstruction("No columns specified for division.", ErrorCodes.INVALID_INSTRUCTION)
+
+        if len(columns) > 2:
+            raise InvalidInstruction("Too many columns specified for division. Maximum two allowed.",
+                                     ErrorCodes.INVALID_INSTRUCTION)
         for column in columns:
             self.__check_column_exists(df, column)
-
-        if value == 0:
-            raise InvalidValue(message="Division by zero is not allowed.", error_code=ErrorCodes.INVALID_VALUE)
-
-        new_column_name = ''.join(columns) + '_divided'
-
-        # Q: Need to handle the case where two columns are provided?
-        if value is not None:
+            if not pd.api.types.is_numeric_dtype(df[column]):
+                raise InvalidColumn(f"Column '{column}' is not numeric and cannot be used for division.",
+                                    ErrorCodes.OPERATION_NOT_SUPPORTED)
+        new_column_name = None
+        if len(columns) == 1:
+            if value is None:
+                raise InvalidValue("A numeric value must be provided for division when only one column specified.",
+                                   ErrorCodes.INVALID_OPERATION)
+            if value == 0:
+                raise InvalidValue("Cannot divide by zero.", ErrorCodes.INVALID_OPERATION)
+            new_column_name = f"{columns[0]}_divided_by_{value}"
             df[new_column_name] = df[columns[0]] / value
-            return df[new_column_name]
+        elif len(columns) == 2:
+            if value is not None:
+                raise InvalidInstruction(
+                    "Only columns should be specified for element-wise division, not a third value.",
+                    ErrorCodes.INVALID_OPERATION)
+            new_column_name = f"{columns[0]}_divided_by_{columns[1]}"
+            df[new_column_name] = df[columns[0]] / df[columns[1]]
+
+        return df[new_column_name]
 
     def avg(self, df: pd.DataFrame, columns: List[str], group_by: str = None):
         """

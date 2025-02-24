@@ -196,6 +196,46 @@ class TestMultiplicationMethod(BaseTest):
         with self.assertRaises(InvalidInstruction):
             self.executor.multiplication(self.df, ['A'])
 
+class TestDivisionMethod(BaseTest):
+    def setUp(self):
+        self.df = pd.DataFrame({
+            'A': [10, 20, 30],
+            'B': [2, 5, 10],
+            'C': [0, 1, 0],  # To test division by zero scenario
+            'NonNumeric': ['a', 'b', 'c']
+        })
+        self.executor = MathOperationExecutor()
+
+    def test_divide_column_by_constant(self):
+        result = self.executor.division(self.df, ['A'], 2)
+        expected = pd.Series([5.0, 10.0, 15.0], name='A_divided_by_2')
+        pd.testing.assert_series_equal(result, expected)
+
+    def test_element_wise_division(self):
+        result = self.executor.division(self.df, ['A', 'B'])
+        expected = pd.Series([5.0, 4.0, 3.0], name='A_divided_by_B')
+        pd.testing.assert_series_equal(result, expected)
+
+    def test_division_by_zero(self):
+        with self.assertRaises(InvalidValue):
+            self.executor.division(self.df, ['A'], 0)
+
+    def test_invalid_column_type_division(self):
+        with self.assertRaises(InvalidColumn):
+            self.executor.division(self.df, ['NonNumeric'], 3)
+
+    def test_invalid_numbers_of_columns(self):
+        with self.assertRaises(InvalidInstruction):
+            self.executor.division(self.df, ['A', 'B', 'C'])
+
+    def test_missing_value_with_single_column(self):
+        with self.assertRaises(InvalidValue):
+            self.executor.division(self.df, ['A'])
+
+    def test_provide_value_with_two_columns(self):
+        with self.assertRaises(InvalidInstruction):
+            self.executor.division(self.df, ['A', 'B'], 3)
+
 
 class TestMathOperationExecutor(unittest.TestCase):
     def setUp(self):
