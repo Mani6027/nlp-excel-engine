@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, send_file, g, request
 
 from core import Engine
-from errors import CustomBaseException
+from custom_exceptions import CustomBaseException
 from utils import validate_process_excel_request
 from config import logger
 

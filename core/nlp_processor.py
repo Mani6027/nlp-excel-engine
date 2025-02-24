@@ -7,7 +7,7 @@ import aiohttp
 import pandas as pd
 
 from constants import Operations, ErrorCodes
-from errors import LLMRaisedException, EmptyColumnException
+from custom_exceptions import LLMRaisedException, EmptyColumnException
 
 
 class Summarizer:

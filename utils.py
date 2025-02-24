@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from config import logger
 from constants import ErrorCodes
-from errors import InvalidInstructionException, InvalidFileException, InvalidParametersException
+from custom_exceptions import InvalidParameters, InvalidInstruction, InvalidFile
 from system_prompt import INITIAL_PROMPT, EXCEL_PARAM_EXTRACTION_PROMPT
 
 
@@ -42,19 +42,19 @@ def validate_process_excel_request(func: callable) -> callable:
     @wraps(func)
     def decorated_function(*args, **kwargs):
         if 'file' not in request.files or 'instructions' not in request.form:
-            raise InvalidParametersException(error_code=ErrorCodes.INVALID_PARAMETERS)
+            raise InvalidParameters(error_code=ErrorCodes.INVALID_PARAMETERS)
 
         file = request.files.get('file')
         instructions = request.form['instructions']
 
         if file.filename == '':
-            raise InvalidFileException(error_code=ErrorCodes.INVALID_FILE)
+            raise InvalidFile(error_code=ErrorCodes.INVALID_FILE)
 
         if instructions:
             excel_metadata = extract_excel_metadata(file)
             params = extract_params_from_instructions(excel_metadata, instructions)
             if not params:
-                raise InvalidInstructionException(error_code=ErrorCodes.INVALID_INSTRUCTION)
+                raise InvalidInstruction(error_code=ErrorCodes.INVALID_INSTRUCTION)
             validated_params = validate_params_from_instructions(params)
             g.params = validated_params
         return func(*args, **kwargs)
