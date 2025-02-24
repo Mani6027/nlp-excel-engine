@@ -237,6 +237,50 @@ class TestDivisionMethod(BaseTest):
             self.executor.division(self.df, ['A', 'B'], 3)
 
 
+class TestAvgMethod(BaseTest):
+    def setUp(self):
+        self.executor = MathOperationExecutor()
+        self.data = {
+            'Region': ['East', 'West', 'East', 'West'],
+            'Sales': [100, 200, 300, 400],
+            'Month': ['Jan', 'Jan', 'Feb', 'Feb']
+        }
+        self.df = pd.DataFrame(self.data)
+
+    def test_avg_on_numeric_column(self):
+        result = self.executor.avg(self.df, columns=['Sales'], group_by='Region')
+        expected_data = {
+            'Region': ['East', 'West'],
+            'avg_of_Sales': [200.0, 300.0]
+        }
+        expected_df = pd.DataFrame(expected_data)
+        pd.testing.assert_frame_equal(result, expected_df)
+
+    def test_avg_with_missing_values(self):
+        self.df.loc[2, 'Sales'] = pd.NA
+        result = self.executor.avg(self.df, columns=['Sales'], group_by='Month')
+        expected_data = {
+            'Month': ['Feb', 'Jan'],
+            'avg_of_Sales': [400.0, 150.0]
+        }
+        expected_df = pd.DataFrame(expected_data)
+        pd.testing.assert_frame_equal(result, expected_df)
+
+    def test_avg_with_non_numeric_column(self):
+        with self.assertRaises(InvalidColumn):
+            self.executor.avg(self.df, columns=['Region'], group_by='Month')
+
+    def test_avg_nonexistent_column(self):
+        with self.assertRaises(InvalidColumn):
+            self.executor.avg(self.df, columns=['Nonexistent'], group_by='Region')
+
+    def test_avg_without_group_by(self):
+        result = self.executor.avg(self.df, columns=['Sales'])
+        expected_data = {'avg_of_Sales': [250.0]}
+        expected_df = pd.DataFrame(expected_data)
+        pd.testing.assert_frame_equal(result, expected_df)
+
+
 class TestMathOperationExecutor(unittest.TestCase):
     def setUp(self):
         # Prepare a sample DataFrame for testing

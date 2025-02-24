@@ -266,15 +266,21 @@ class MathOperationExecutor:
         :param group_by: Column to group by
         :return: Average of the specified column
         """
-        for column in columns:
-            self.__check_column_exists(df, column)
-
+        if not columns or len(columns) > 1:
+            raise InvalidInstruction("Exactly one column must be specified for the average calculation.",
+                                     ErrorCodes.INVALID_INSTRUCTION)
+        column = columns[0]
+        self.__check_column_exists(df, column)
+        if not pd.api.types.is_numeric_dtype(df[column]):
+            raise InvalidColumn(f"Column '{column}' is not numeric and cannot be used for averaging.",
+                                ErrorCodes.OPERATION_NOT_SUPPORTED)
         if group_by:
-            df[f'avg_of_{columns[0]}'] = df.groupby(group_by)[columns[0]].mean()
+            self.__check_column_exists(df, group_by)
+            result = df.groupby(group_by)[column].mean().reset_index(name=f'avg_of_{column}')
         else:
-            df[f'avg_of_{columns[0]}'] = df[columns[0]].mean()
-
-        return df[f'avg_of_{columns[0]}']
+            avg_value = df[column].mean()
+            result = pd.DataFrame({f'avg_of_{column}': [avg_value]})
+        return result
 
     def execute(self, df: pd.DataFrame, metadata: dict, right_df = None) -> Union[pd.DataFrame, pd.Series, float]:
         """

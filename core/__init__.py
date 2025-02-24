@@ -18,6 +18,11 @@ class FileHandler:
     def df_dict(self) -> dict[str, pd.DataFrame]:
         return self.__load_df
 
+    def update_df(self, df: pd.DataFrame, sheet_name: str):
+        """Updates the dataframe for the specified sheet."""
+        self.__load_df[sheet_name] = df
+        logger.info(f"Updated dataframe for sheet '{sheet_name}'")
+
     def load_file(self) -> None:
         """Loads Excel file from a file stream into a Pandas DataFrame."""
         xls = pd.ExcelFile(self.file_stream, engine='openpyxl')
@@ -55,11 +60,14 @@ class Engine:
 
         if (self._metadata.get('operation') in
                 {Operations.SENTIMENT_ANALYSIS, Operations.SUMMARIZATION}):
-            self._nlp_operation_executor.execute(df, self._metadata)
+            result = self._nlp_operation_executor.execute(df, self._metadata)
         elif self._metadata.get('operation') == Operations.OPERATION_JOIN:
             right_df = self._file_handler.df_dict.get(self._metadata.get('sheets')[1])
-            self._math_operation_executor.execute(df, self._metadata, right_df)
+            result = self._math_operation_executor.execute(df, self._metadata, right_df)
         else:
-            self._math_operation_executor.execute(df, self._metadata)
+            result = self._math_operation_executor.execute(df, self._metadata)
+
+        if result is not None and isinstance(result, pd.DataFrame):
+            self._file_handler.update_df(result, "result_sheet")
 
         self._file_handler.save_file()
