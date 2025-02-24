@@ -1,13 +1,13 @@
 import io
+import json
 from io import BytesIO
 from unittest.mock import patch
 
 import pandas as pd
-from pydantic import ValidationError
 
-from utils import extract_excel_metadata
 from tests import BaseTest
 from tests.mocks.mock_utils import app
+from utils import extract_excel_metadata
 
 
 class TestValidateProcessExcelRequest(BaseTest):
@@ -17,7 +17,7 @@ class TestValidateProcessExcelRequest(BaseTest):
         """Set up Flask test client"""
         self.client = app.test_client()
 
-    @patch("app.utils.extract_params_from_instructions")
+    @patch("utils.extract_params_from_instructions")
     def test_valid_request(self, mock_parse_params_from_instructions):
         """ Test with valid file and valid instructions"""
         output = BytesIO()
@@ -32,6 +32,7 @@ class TestValidateProcessExcelRequest(BaseTest):
         }
         mock_parse_params_from_instructions.return_value ={"operation": "Summation", "columns": ["A", "B"]}
         response = self.client.post("/process_excel", data=data, content_type='multipart/form-data')
+        print(response.text)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {"message": "Success"})
 
@@ -40,23 +41,29 @@ class TestValidateProcessExcelRequest(BaseTest):
         data = {"instructions": "valid instruction"}
         response = self.client.post("/process_excel", data=data, content_type='multipart/form-data')
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json(), {"error": "File and instructions are required"})
+        res = json.loads(response.text)
+        self.assertEqual(res['error'], "Invalid parameters. Provide valid parameters.")
+        self.assertEqual(res['error_code'], "INVALID_PARAMETERS")
 
-    def test_missing_instructions(self):
+    def test_invalid_file_data(self):
         """ Test when instructions are missing"""
         data = {"file": (BytesIO(b"dummy data"), "test.xlsx")}
-        response = self.client.post("/process_excel", data=data, content_type='multipart/form-data')
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json(), {"error": "File and instructions are required"})
+        res = self.client.post("/process_excel", data=data, content_type='multipart/form-data')
+        self.assertEqual(res.status_code, 400)
+        res = json.loads(res.text)
+        self.assertEqual(res['error'], "Invalid parameters. Provide valid parameters.")
+        self.assertEqual(res['error_code'], "INVALID_PARAMETERS")
 
     def test_empty_filename(self):
         """ Test when file is uploaded but has an empty filename"""
         data = {"file": (BytesIO(b"dummy data"), ""), "instructions": "valid instruction"}
         response = self.client.post("/process_excel", data=data, content_type='multipart/form-data')
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json(), {"error": "No selected file"})
+        res = json.loads(response.text)
+        self.assertEqual(res['error'], "Invalid file. Upload a valid Excel file.")
+        self.assertEqual(res['error_code'], "INVALID_FILE")
 
-    @patch("app.utils.extract_params_from_instructions", return_value=None)
+    @patch("utils.extract_params_from_instructions", return_value=None)
     def test_invalid_instructions(self, mock_parse):
         """ Test with invalid instructions (extract_params_from_instructions fails)"""
 
@@ -72,12 +79,12 @@ class TestValidateProcessExcelRequest(BaseTest):
         }
         mock_parse.return_value = {"operation": "Invalid", "columns": [], "sheets": [], "parameters": {}}
 
-        exception_raised = False
-        try:
-            self.client.post("/process_excel", data=data, content_type='multipart/form-data')
-        except ValidationError as e:
-            pass
-
+        res = self.client.post("/process_excel", data=data, content_type='multipart/form-data')
+        self.assertEqual(res.status_code, 400)
+        res = res.text
+        res = json.loads(res)
+        self.assertEqual(res['error'], "Adjust your query to include at least one column or sheet.")
+        self.assertEqual(res['error_code'], "INVALID_INSTRUCTION")
 
 
 class TestExtractExcelMetadata(BaseTest):
