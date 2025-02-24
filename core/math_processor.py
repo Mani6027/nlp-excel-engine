@@ -127,7 +127,6 @@ class MathOperationExecutor:
         :param value_name: Name of the new column to create
         :return: Unpivoted DataFrame
         """
-        # Check if all columns exist
         for column in id_vars:
             self.__check_column_exists(df, column)
 

@@ -327,6 +327,50 @@ class TestPivotMethod(BaseTest):
         expected_df = pd.DataFrame(columns=['Category'])
         pd.testing.assert_frame_equal(result, expected_df)
 
+
+class TestUnpivotMethod(BaseTest):
+    def setUp(self):
+        self.executor = MathOperationExecutor()
+        self.df = pd.DataFrame({
+            'ID': [1, 2],
+            'Var1': [100, 200],
+            'Var2': [300, 400],
+            'Var3': [500, 600]
+        })
+
+    def test_unpivot_success(self):
+        result = self.executor.unpivot(self.df, id_vars=['ID'])
+        expected_data = {
+            'ID': [1, 2, 1, 2, 1, 2],
+            'Metric': ['Var1', 'Var1', 'Var2', 'Var2', 'Var3', 'Var3'],
+            'Value': [100, 200, 300, 400, 500, 600]
+        }
+        expected_df = pd.DataFrame(expected_data)
+        pd.testing.assert_frame_equal(result, expected_df)
+
+    def test_unpivot_with_missing_id_var(self):
+        with self.assertRaises(InvalidColumn):
+            self.executor.unpivot(self.df, id_vars=['NonexistentColumn'])
+
+    def test_unpivot_with_multiple_id_vars(self):
+        self.df['Category'] = ['A', 'B']
+        result = self.executor.unpivot(self.df, id_vars=['ID', 'Category'])
+        expected_data = {
+            'ID': [1, 2, 1, 2, 1, 2],
+            'Category': ['A', 'B', 'A', 'B', 'A', 'B'],
+            'Metric': ['Var1', 'Var1', 'Var2', 'Var2', 'Var3', 'Var3'],
+            'Value': [100, 200, 300, 400, 500, 600]
+        }
+        expected_df = pd.DataFrame(expected_data)
+        pd.testing.assert_frame_equal(result, expected_df)
+
+    def test_unpivot_empty_dataframe(self):
+        empty_df = pd.DataFrame(columns=['ID', 'Var1', 'Var2', 'Var3'])
+        result = self.executor.unpivot(empty_df, id_vars=['ID'])
+        expected_df = pd.DataFrame(columns=['ID', 'Metric', 'Value'])
+        pd.testing.assert_frame_equal(result, expected_df)
+
+
 class TestJoinMethod(BaseTest):
     def setUp(self):
         self.executor = MathOperationExecutor()
