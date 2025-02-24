@@ -28,7 +28,8 @@ class Parameters(BaseModel):
     @model_validator(mode="after")
     def validate_non_empty(self):
         if not self.columns and not self.sheets:
-            raise ValueError("At least one of 'columns' or 'sheets' must be provided.")
+            raise InvalidInstruction("Adjust your query to include at least one column or sheet.",
+                                    error_code=ErrorCodes.INVALID_INSTRUCTION)
         return self
 
     def to_dict(self):
