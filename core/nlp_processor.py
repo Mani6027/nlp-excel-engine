@@ -6,11 +6,13 @@ from typing import Any
 import aiohttp
 import pandas as pd
 
-from constants import Operations, ErrorCodes
-from custom_exceptions import LLMRaisedException, EmptyColumnException
+from config import logger
+from constants import Operations
+from custom_exceptions import EmptyColumnException
+
 
 class BaseNLModel:
-    def __init__(self, gemini_model_name: str = "gemini-2.0-flash", chunk_size: int = 100):
+    def __init__(self, gemini_model_name: str = "gemini-2.0-flash", chunk_size: int = 20):
         self._api_key = os.environ.get('GEMINI_FLASH_API_KEY')
         self._model_name = gemini_model_name
         self.chunk_size = chunk_size
@@ -33,7 +35,7 @@ class Summarizer(BaseNLModel):
             }],
             "generationConfig": {
                 "temperature": 0.0,
-                "maxOutputTokens": 1000,
+                "maxOutputTokens": 7192, # Optimize this later.
             }
         }
 
@@ -45,9 +47,6 @@ class Summarizer(BaseNLModel):
         payload = self.__format_payload(chunk)
         async with aiohttp.ClientSession() as session:
             async with session.post(self._api_url, headers=headers, json=payload) as response:
-                if response.status != 200:
-                    raise LLMRaisedException(message=f"Request failed: {response.status} - {await response.text()}",
-                                             error_code=ErrorCodes.LLM_RAISED_EXCEPTION)
                 result = await response.json()
                 for candidate in result.get("candidates", []):
                     for part in candidate.get("content", {}).get("parts", []):
@@ -57,7 +56,7 @@ class Summarizer(BaseNLModel):
         """Processes each chunk of data and gathers responses."""
         tasks = [asyncio.create_task(self.__call_llm_api(chunk)) for chunk in chunks]
         responses = await asyncio.gather(*tasks, return_exceptions=True)
-        return responses
+        return [response for response in responses if response]
 
     async def __summarize_chunks(self, data_list: list[str]) -> list[str]:
         """Summarizes the text from a list of strings in chunks."""
@@ -68,6 +67,7 @@ class Summarizer(BaseNLModel):
     async def __summarize(self, data_list: list[str]) -> list[str]:
         """Summarizes the text from a list of strings."""
         initial_summaries = await self.__summarize_chunks(data_list)
+        # can comment this out if you want to see the full summaries
         final_summary = await self.__summarize_chunks(initial_summaries)
         return final_summary
 
@@ -84,35 +84,34 @@ class TextClassifier(BaseNLModel):
     @staticmethod
     def __format_payload(chunk: list[str]) -> dict:
         """Formats the payload for the LLM API call."""
-        system_content = {"text": "Perform sentiment analysis on each sentence separately and return JSON in this format: {\"index\": <number>, \"text\": \"<input>\", \"sentiment\": \"Positive|Negative|Neutral\"}. Respond with a JSON array containing results for each input."}
+        system_content = {"text": "Perform sentiment analysis on each provided text separately and return the result in JSON format. Each input will be structured as \"<index>: <number> <text>: <input>\". Extract the index and text, then respond with a JSON array where each object includes the original index, text, and a 'sentiment' field with values 'Positive', 'Negative', or 'Neutral'."}
         return {
             "contents": [
                 {
                     "role": "user",
-                    "parts": [system_content] + [{"text": json.dumps(text)} for text in chunk]
+                    "parts": [system_content] + [{"text": json.dumps(f"<index>: {index} <text>: {text}")} for index, text in chunk]
                 }
             ],
             "generationConfig": {
                 "temperature": 0.0,
-                "maxOutputTokens": 1000,
+                "maxOutputTokens": 7192, # Optimize this later.
             }
         }
 
     @staticmethod
     def __format_response(response: dict) -> list[str]:
         """Formats the response from the API call."""
-        sentiments = []
-        for candidate in response.get("candidates", []):
-            for part in candidate.get("content", {}).get("parts", []):
-                raw_text = part["text"]
-                # Remove markdown formatting
-                if raw_text.startswith("```json"):
-                    raw_text = raw_text.replace("```json", "").replace("```", "").strip()
-                try:
-                    sentiments.append(json.loads(raw_text))  # Convert to dictionary
-                except json.JSONDecodeError:
-                    print("Error decoding JSON:", raw_text)
-        return sentiments
+        data_list = []
+        json_text = response.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', "")
+        if json_text:
+            json_text = json_text.replace("```json\n", "").replace("\n```", "")
+        else:
+            return data_list
+        try:
+            data_list = json.loads(json_text)
+        except json.JSONDecodeError as e:
+            logger.info(f"Error decoding JSON: {e}")
+        return data_list
 
     async def __fetch_sentiments(self, chunks: list[str]) -> list[str]:
         """Summarizes the text from a list of strings in chunks."""
@@ -124,18 +123,23 @@ class TextClassifier(BaseNLModel):
 
     async def __process_chunks(self, chunks):
         """Processes each chunk of data and gathers responses."""
+        results = []
         tasks = [asyncio.create_task(self.__fetch_sentiments(chunk)) for chunk in chunks]
         responses = await asyncio.gather(*tasks, return_exceptions=True)
-        return responses
 
-    async def __classify(self, data_list: list[str]) -> list[list[dict[str, Any]]]:
-        """Summarizes the text from a list of strings in chunks."""
+        for response in responses:
+            if response:
+                results.extend(response)
+        return results
+
+    async def __classify(self, data_list: list[tuple[int, str]]) -> list[dict[str, Any]]:
+        """Classifies the text from a list of strings in chunks."""
         chunks = self.chunk_data(data_list)
-        summaries = await self.__process_chunks(chunks)
-        return summaries
+        result = await self.__process_chunks(chunks)
+        return result
 
-    def classify(self, data_list: list[str]) -> list[list[dict[str, Any]]]:
-        """Summarizes the text from a list of strings."""
+    def classify(self, data_list: list[tuple[int, str]]) -> list[dict[str, Any]]:
+        """Classifies the text from a list of strings."""
         responses = asyncio.run(self.__classify(data_list))
         return responses
 
@@ -150,27 +154,25 @@ class NLPTaskExecutor:
         """
             Sentiment analysis on column.
         """
-        data_list = df[column].tolist()
+        data_list = list(df[column].items())
         if not data_list:
             raise EmptyColumnException(column_name=column)
         responses = self._text_classifier.classify(data_list)
 
         sentiment_dict = {}
+        logger.debug(f"Responses: {responses}")
         for response in responses:
-            if isinstance(response, list):
-                for item in response:
-                    _index = item.get('index')
-                    text = item.get('text')
-                    sentiment = item.get('sentiment')
-                    if text and sentiment and _index is not None:
-                        # Concatenate the text and index to create a unique key
-                        sentiment_dict[(text, _index)] = sentiment
+            _index = response.get('index')
+            text = response.get('text')
+            sentiment = response.get('sentiment')
+            if text and sentiment and _index is not None:
+                sentiment_dict[(text, _index)] = sentiment
 
         def select_value(index_value: int, row_val):
-            key = (row_val, index_value)
+            key = (row_val, str(index_value))
             return sentiment_dict.get(key, "Unclassified")
 
-        df[f'Classified_{column}'] = df[column].apply(lambda row: select_value(row.name, row[column]), axis=1)
+        df[f'Classified_{column}'] = df.apply(lambda row: select_value(row.name, row[column]), axis=1)
         return df
 
     def summarization(self, df: pd.DataFrame, column: str, on: str = None) -> pd.DataFrame:
@@ -186,7 +188,6 @@ class NLPTaskExecutor:
             raise EmptyColumnException(column_name=column)
 
         summary = self._summarizer.summarize(data_list)
-        print(summary)
         df[f'Summarized_{column}'] = pd.Series(summary[:len(data_list)]).reindex(df.index)
         return df
 

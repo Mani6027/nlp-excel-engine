@@ -7,8 +7,10 @@ class Operations:
     MULTIPLICATION = 'multiplication'
     DIVISION = 'division'
     AVG = 'avg'
+    MIN = 'min'
+    MAX = 'max'
 
-    ALL_MATH_OPERATIONS = [ADDITION, SUMMATION, SUBTRACTION, MULTIPLICATION, DIVISION, AVG]
+    ALL_MATH_OPERATIONS = [ADDITION, SUMMATION, SUBTRACTION, MULTIPLICATION, DIVISION, AVG, MIN, MAX]
 
     # NLP operations
     SENTIMENT_ANALYSIS = 'sentiment_analysis'
@@ -23,7 +25,7 @@ class Operations:
     INNER_JOIN = 'inner_join'
     LEFT_JOIN = 'left_join'
     RIGHT_JOIN = 'right_join'
-    FULL_OUTER_JOIN = 'full_outer_join'
+    FULL_OUTER_JOIN = 'outer_join'
 
     # date operations
     DATE_DIFFERENCE = 'date_difference'

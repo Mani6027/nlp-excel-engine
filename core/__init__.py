@@ -32,7 +32,7 @@ class FileHandler:
             if sheet not in xls.sheet_names:
                 raise ValueError(f"Sheet '{sheet}' does not exist in the Excel file.")
 
-        for sheet in self.sheet_names:
+        for sheet in xls.sheet_names:
             self.__load_df[sheet] = pd.read_excel(xls, sheet_name=sheet)
 
     def save_file(self, save_path: str = './output.xlsx') -> None:
@@ -61,7 +61,10 @@ class Engine:
         if (self._metadata.get('operation') in
                 {Operations.SENTIMENT_ANALYSIS, Operations.SUMMARIZATION}):
             result = self._nlp_operation_executor.execute(df, self._metadata)
-        elif self._metadata.get('operation') == Operations.OPERATION_JOIN:
+        elif self._metadata.get('operation') in {Operations.INNER_JOIN, Operations.LEFT_JOIN, Operations.RIGHT_JOIN,
+                                                 Operations.FULL_OUTER_JOIN}:
+            logger.info(f"Join operation detected: {self._metadata.get('operation')}")
+            logger.info(f"Right sheet: {self._file_handler.df_dict}")
             right_df = self._file_handler.df_dict.get(self._metadata.get('sheets')[1])
             result = self._math_operation_executor.execute(df, self._metadata, right_df)
         else:
