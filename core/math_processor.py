@@ -28,7 +28,8 @@ class MathOperationExecutor:
 
     @staticmethod
     def __calculate_dt_difference_in_months(df, column_start, column_end):
-        df['Month_diff'] = df.apply(lambda row: relativedelta(row[column_end], row[column_start]).months, axis=1)
+        df['Month_diff'] = df.apply(lambda row: relativedelta(row[column_end], row[column_start]).years * 12
+                                                + relativedelta(row[column_end], row[column_start]).months, axis=1)
         return df['Month_diff']
 
     @staticmethod
@@ -80,6 +81,9 @@ class MathOperationExecutor:
         if isinstance(on, str):
             on = [on]
 
+        logger.debug(f"debug right df: {right_df.columns}")
+        logger.debug(f"debug left df: {left_df.columns}")
+        logger.debug(f"on :: {on}")
         missing_columns = [column for column in on if column not in left_df.columns or column not in right_df.columns]
         if missing_columns:
             raise InvalidColumn(
@@ -95,7 +99,7 @@ class MathOperationExecutor:
 
         return pd.merge(left_df, right_df, how=how, on=on)
 
-    def pivot(self, df: pd.DataFrame, index_col: str, value_col: str, aggfunc: str = 'sum') -> pd.DataFrame:
+    def pivot(self, df: pd.DataFrame, index_col: str, value_col: str, aggfunc: str = 'sum', columns: list = None) -> pd.DataFrame:
         """
         Creates a pivot table from the DataFrame
 
@@ -103,9 +107,13 @@ class MathOperationExecutor:
         :param index_col: Column(s) to use as rows in the pivot table
         :param value_col: Column to aggregate
         :param aggfunc: Aggregation function to use, default is 'sum'
+        :param columns: Columns to include in the pivot table
         :return: A pivot table DataFrame
         """
-        for column in [index_col, value_col]:
+        logger.debug(f"columns :: {columns}")
+        logger.debug(f"index_col :: {index_col}")
+        logger.debug(f"value_col :: {value_col}")
+        for column in [index_col, value_col] + (columns or []):
             self.__check_column_exists(df, column)
 
         valid_aggfuncs = {'sum', 'mean', 'max', 'min', 'count', 'prod'}
@@ -113,7 +121,7 @@ class MathOperationExecutor:
             raise InvalidOperation(f"Choose aggregation operations from: {', '.join(valid_aggfuncs)}.",
                                    error_code=ErrorCodes.INVALID_OPERATION)
 
-        pivot_table = pd.pivot_table(df, index=index_col, values=value_col, aggfunc=aggfunc)
+        pivot_table = pd.pivot_table(df, index=index_col, values=value_col, aggfunc=aggfunc, columns=columns)
         return pivot_table.reset_index()
 
     def unpivot(self, df: pd.DataFrame, id_vars: List[str],
@@ -152,7 +160,7 @@ class MathOperationExecutor:
         if len(num_columns) == 0:
             raise InvalidColumn(message="Provide at least one numeric column.", error_code=ErrorCodes.INVALID_COLUMN)
 
-        new_column_name = ''.join(num_columns) + '_sum'
+        new_column_name = '_'.join(num_columns) + '_sum'
         df[new_column_name] = (df[num_columns].sum(axis=1)
                                if len(num_columns) > 1 else df[num_columns[0]]).astype(float)
 
@@ -295,26 +303,90 @@ class MathOperationExecutor:
             result = pd.DataFrame({f'avg_of_{column}': [avg_value]})
         return result
 
+    def _min(self, df: pd.DataFrame, columns: List[str], group_by: str = None):
+        """
+            Min operation on specified column
+
+        :param df: DataFrame to perform the operation on
+        :param columns: List of column names to perform the operation on
+        :param group_by: Column to group by
+        :return: Minimum value of the specified column
+        """
+        if not columns:
+            raise InvalidInstruction(message="Please specify column name to min.",
+                                     error_code=ErrorCodes.INVALID_INSTRUCTION)
+
+        if not columns or len(columns) > 1:
+            raise InvalidInstruction("Exactly one column must be specified for the min calculation.",
+                                     ErrorCodes.INVALID_INSTRUCTION)
+        column = columns[0]
+        for column in columns:
+            self.__check_column_exists(df, column)
+            if not pd.api.types.is_numeric_dtype(df[column]):
+                raise InvalidColumn(f"Column '{column}' is not numeric and cannot be used for min.",
+                                    ErrorCodes.OPERATION_NOT_SUPPORTED)
+        if group_by:
+            self.__check_column_exists(df, group_by)
+            result = df.groupby(group_by)[column].min().reset_index(name=f'min_of_{column}')
+        else:
+            min_value = df[column].min()
+            result = pd.DataFrame({f'min_of_{column}': [min_value]})
+        return result
+
+    def _max(self, df: pd.DataFrame, columns: List[str], group_by: str = None):
+        """
+            Max operation on specified column
+
+        :param df: DataFrame to perform the operation on
+        :param columns: List of column names to perform the operation on
+        :param group_by: Column to group by
+        :return: Maximum value of the specified column
+        """
+        if not columns:
+            raise InvalidInstruction(message="Please specify column name to max.",
+                                     error_code=ErrorCodes.INVALID_INSTRUCTION)
+
+        if not columns or len(columns) > 1:
+            raise InvalidInstruction("Exactly one column must be specified for the max calculation.",
+                                     ErrorCodes.INVALID_INSTRUCTION)
+        column = columns[0]
+        for column in columns:
+            self.__check_column_exists(df, column)
+            if not pd.api.types.is_numeric_dtype(df[column]):
+                raise InvalidColumn(f"Column '{column}' is not numeric and cannot be used for max.",
+                                    ErrorCodes.OPERATION_NOT_SUPPORTED)
+        if group_by:
+            self.__check_column_exists(df, group_by)
+            result = df.groupby(group_by)[column].max().reset_index(name=f'max_of_{column}')
+        else:
+            max_value = df[column].max()
+            result = pd.DataFrame({f'max_of_{column}': [max_value]})
+        return result
+
     def _handle_pivot_table(self, df: pd.DataFrame, metadata: dict) -> pd.DataFrame:
-        return self.pivot(df, metadata.get('index_column'), metadata.get('values_column'),
-                          metadata.get('aggregation_function'))
+        parameters = metadata.get('parameters', {})
+        return self.pivot(df, parameters.get('index_column'), parameters.get('value_column'),
+                          parameters.get('aggfunc'), parameters.get('columns'))
 
     def _handle_unpivot_table(self, df: pd.DataFrame, metadata: dict) -> pd.DataFrame:
-        return self.unpivot(df, metadata.get("id_vars"), metadata.get("var_name"), metadata.get("value_name"))
+        parameters = metadata.get('parameters', {})
+        return self.unpivot(df, parameters.get('id_vars'), parameters.get('var_name'), parameters.get('value_name'))
 
     def _handle_join(self, left_df: pd.DataFrame, right_df: pd.DataFrame, metadata: dict) -> pd.DataFrame:
-        join_type = metadata.get("parameters", {}).get("join_type")
+        join_type = metadata.get("parameters", {}).get("join_type") or metadata.get("operation")
         on = metadata.get("parameters", {}).get("on")
         how = Operations.DF_JOIN_MAPPER.get(join_type)
         return self.join(left_df, right_df=right_df, how=how, on=on)
 
-    def _get_operation_method(self, operation):
+    def _get_math_operation_method(self, operation):
         operation_mapper = {
             Operations.ADDITION: self.sum,  # Alias for summation
             Operations.SUMMATION: self.sum,
             Operations.SUBTRACTION: self.subtraction,
             Operations.MULTIPLICATION: self.multiplication,
             Operations.DIVISION: self.division,
+            Operations.MIN: self._min,
+            Operations.MAX: self._max,
         }
         return operation_mapper[operation]
 
@@ -341,21 +413,21 @@ class MathOperationExecutor:
         operation = metadata['operation']
         columns = metadata.get('columns')
 
-        if operation not in Operations.ALL_MATH_OPERATIONS:
-            raise InvalidOperation(message=f"Unknown operation: {operation}", error_code=ErrorCodes.INVALID_OPERATION)
-
         if operation == Operations.PIVOT_TABLE:
             return self._handle_pivot_table(df, metadata)
         if operation == Operations.UNPIVOT_TABLE:
             return self._handle_unpivot_table(df, metadata)
-        if operation == Operations.OPERATION_JOIN:
+        if operation in {Operations.FULL_OUTER_JOIN, Operations.INNER_JOIN, Operations.LEFT_JOIN, Operations.RIGHT_JOIN}:
             return self._handle_join(df, right_df, metadata)
         if operation == Operations.DATE_DIFFERENCE:
             return self.date_difference(df, metadata.get('columns')[0], metadata.get('columns')[1],
                                         metadata.get('parameters', {}).get('unit'))
-        if operation == Operations.AVG:
+        if operation == {Operations.AVG, Operations.MIN, Operations.MAX}:
             return self.avg(df, columns, metadata.get('parameters', {}).get('group_by'))
 
+        if operation not in Operations.ALL_MATH_OPERATIONS:
+            raise InvalidOperation(message=f"Unknown operation: {operation}", error_code=ErrorCodes.INVALID_OPERATION)
+
         # Default handling for mathematical operations
-        method = self._get_operation_method(operation)
+        method = self._get_math_operation_method(operation)
         return method(df, columns, metadata.get(self._get_value_key(operation)))

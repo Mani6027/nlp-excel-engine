@@ -11,9 +11,9 @@ from flask import request, g
 from pydantic import BaseModel, Field, model_validator
 
 from config import logger
-from constants import ErrorCodes
+from constants import ErrorCodes, Operations
 from custom_exceptions import InvalidParameters, InvalidInstruction, InvalidFile
-from system_prompt import OBJECTIVE_PROMPT, EXCEL_PARAM_EXTRACTION_PROMPT
+from system_prompt import EXCEL_PARAM_EXTRACTION_PROMPT
 
 
 # create a schema for parameters checking from instructions
@@ -24,12 +24,19 @@ class Parameters(BaseModel):
     operation: str = Field(..., description="The identified operation from the query.")
     columns: list[str] = Field(default_factory=list, description="List of column names extracted from the query.")
     sheets: list[str] = Field(default_factory=list, description="List of sheet names extracted from the query.")
+    parameters: dict = Field(default_factory=dict, description="Parameters extracted from the query.")
 
     @model_validator(mode="after")
     def validate_non_empty(self):
-        if not self.columns and not self.sheets:
-            raise InvalidInstruction("Adjust your query to include at least one column or sheet.",
-                                    error_code=ErrorCodes.INVALID_INSTRUCTION)
+        is_pivot_table = self.operation in {Operations.PIVOT_TABLE, Operations.UNPIVOT_TABLE}
+        if (not self.columns) and (not is_pivot_table):
+            raise InvalidInstruction("Adjust your query to include at least one column.", error_code=ErrorCodes.INVALID_INSTRUCTION)
+        elif not self.sheets:
+            raise InvalidInstruction("Adjust your query to include at least one sheet.", error_code=ErrorCodes.INVALID_INSTRUCTION)
+        if not self.parameters and (self.operation in {Operations.PIVOT_TABLE, Operations.UNPIVOT_TABLE, Operations.INNER_JOIN,
+                              Operations.LEFT_JOIN, Operations.RIGHT_JOIN, Operations.FULL_OUTER_JOIN}):
+            raise InvalidInstruction(message=f"Could not understand by the system. Describe the operation in more detail.",
+                                     error_code=ErrorCodes.OPERATION_NOT_SUPPORTED)
         return self
 
     def to_dict(self):
@@ -74,7 +81,8 @@ def extract_params_from_instructions(excel_metadata, instructions: str) -> dict:
         "max_output_tokens": 8192,
         "response_mime_type": "application/json",
     }
-    system_prompt = OBJECTIVE_PROMPT.format(excel_metadata=excel_metadata) + EXCEL_PARAM_EXTRACTION_PROMPT
+    system_prompt = EXCEL_PARAM_EXTRACTION_PROMPT.format(excel_metadata=excel_metadata, user_query=instructions)
+    logger.info(f"system_prompt: {system_prompt}")
     model = genai.GenerativeModel(
         "gemini-2.0-flash",
         generation_config=generation_config,
@@ -101,10 +109,7 @@ def extract_excel_metadata(file_stream):
     metadata = {}
     xls = pd.ExcelFile(file_stream, engine='openpyxl')
     for sheet in xls.sheet_names:
-        df = pd.read_excel(xls, sheet_name=sheet, nrows=5)  # Read only first few rows to find out dt
-        metadata[sheet] = {
-            "columns": list(df.columns),
-            "data_types": df.dtypes.apply(lambda x: str(x)).to_dict()
-        }
+        df = pd.read_excel(xls, sheet_name=sheet, nrows=2)
+        metadata[sheet] = list(df.columns)
     logger.debug(f"metadata of uploaded excel file:: {metadata}")
     return metadata

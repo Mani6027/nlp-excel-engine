@@ -68,14 +68,14 @@ class TestSumMethod(BaseTest):
     def test_sum(self):
         """Test that it sums the numeric columns."""
         result = self.executor.sum(self.df, ['A', 'B'])
-        expected = pd.Series([6.0, 8.0, 10.0, 12.0], name='AB_sum')
+        expected = pd.Series([6.0, 8.0, 10.0, 12.0], name='A_B_sum')
         pd.testing.assert_series_equal(result, expected)
 
     def test_sum_with_non_numeric_column(self):
         """Test that it ignores non-numeric columns."""
         self.df['C'] = ['a', 'b', 'c', 'd']
         result = self.executor.sum(self.df, ['A', 'B', 'C'])
-        expected = pd.Series([6.0, 8.0, 10.0, 12.0], name='AB_sum')
+        expected = pd.Series([6.0, 8.0, 10.0, 12.0], name='A_B_sum')
         pd.testing.assert_series_equal(result, expected)
 
     def test_sum_with_non_existent_column(self):
@@ -97,7 +97,7 @@ class TestSumMethod(BaseTest):
     def test_sum_with_column_and_constant(self):
         """Test that it sums the numeric columns with a constant."""
         result = self.executor.sum(self.df, ['A', 'B'], 2)
-        expected = pd.Series([8.0, 10.0, 12.0, 14.0], name='AB_sum')
+        expected = pd.Series([8.0, 10.0, 12.0, 14.0], name='A_B_sum')
         pd.testing.assert_series_equal(result, expected)
 
     def test_sum_with_one_column_and_value(self):
@@ -424,3 +424,91 @@ class TestJoinMethod(BaseTest):
             'description': ['twenty','thirty']
         })
         pd.testing.assert_frame_equal(result_df, expected_df)
+
+
+class TestMinMethod(BaseTest):
+    def setUp(self):
+        """Create a sample DataFrame for testing."""
+        self.executor = MathOperationExecutor()
+        self.df = pd.DataFrame({
+            'A': [1, 2, 3],
+            'B': [4, 5, 6],
+            'C': ['2020-01-01', '2021-01-01', '2022-01-01']
+        })
+
+    def test_min_operation_valid(self):
+        """Test min operation on a valid numeric column."""
+        result = self.executor._min(self.df, ['A'])
+        expected = pd.DataFrame({'min_of_A': [1]})
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_min_operation_group_by(self):
+        """Test min operation when grouped by another column."""
+        self.df['Group'] = ['X', 'Y', 'X']
+        result = self.executor._min(self.df, ['A'], group_by='Group')
+        expected = pd.DataFrame({'Group': ['X', 'Y'], 'min_of_A': [1, 2]})
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_min_operation_invalid_column(self):
+        """Test min operation with non-existing column."""
+        with self.assertRaises(InvalidColumn):
+            self.executor._min(self.df, ['Z'])
+
+    def test_min_operation_non_numeric_column(self):
+        """Test min operation on a non-numeric column."""
+        with self.assertRaises(InvalidColumn):
+            self.executor._min(self.df, ['C'])
+
+    def test_min_operation_no_columns(self):
+        """Test min operation with no columns specified."""
+        with self.assertRaises(InvalidInstruction):
+            self.executor._min(self.df, [])
+
+    def test_min_operation_too_many_columns(self):
+        """Test min operation with too many columns specified."""
+        with self.assertRaises(InvalidInstruction):
+            self.executor._min(self.df, ['A', 'B'])
+
+
+class TestMaxMethod(BaseTest):
+    def setUp(self):
+        """Create a sample DataFrame for testing."""
+        self.executor = MathOperationExecutor()
+        self.df = pd.DataFrame({
+            'A': [1, 2, 3],
+            'B': [4, 5, 6],
+            'C': ['2020-01-01', '2021-01-01', '2022-01-01']
+        })
+
+    def test_max_operation_valid(self):
+        """Test max operation on a valid numeric column."""
+        result = self.executor._max(self.df, ['A'])
+        expected = pd.DataFrame({'max_of_A': [3]})
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_max_operation_group_by(self):
+        """Test max operation when grouped by another column."""
+        self.df['Group'] = ['X', 'Y', 'X']
+        result = self.executor._max(self.df, ['A'], group_by='Group')
+        expected = pd.DataFrame({'Group': ['X', 'Y'], 'max_of_A': [3, 2]})
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_max_operation_invalid_column(self):
+        """Test max operation with non-existing column."""
+        with self.assertRaises(InvalidColumn):
+            self.executor._max(self.df, ['Z'])
+
+    def test_max_operation_non_numeric_column(self):
+        """Test max operation on a non-numeric column."""
+        with self.assertRaises(InvalidColumn):
+            self.executor._max(self.df, ['C'])
+
+    def test_max_operation_no_columns(self):
+        """Test max operation with no columns specified."""
+        with self.assertRaises(InvalidInstruction):
+            self.executor._max(self.df, [])
+
+    def test_max_operation_too_many_columns(self):
+        """Test max operation with too many columns specified."""
+        with self.assertRaises(InvalidInstruction):
+            self.executor._max(self.df, ['A', 'B'])
